@@ -6,8 +6,8 @@ import pytz
 from alpaca_trade_api.rest import REST, TimeFrame
 
 # ── CONFIG ─────────────────────────────────────────────────────────
-API_KEY    = os.getenv("PK6B60HN8XYN6BCSAZUD")
-API_SECRET = os.getenv("cMlZ5giflRey7Tw9x0VTAJ5XeRLFsqnueubu4B1o")
+API_KEY    = os.getenv("APCA_API_KEY_ID")
+API_SECRET = os.getenv("APCA_API_SECRET_KEY")
 BASE_URL   = "https://paper-api.alpaca.markets"
 
 UNIVERSE   = "SPY"  # or load a list of S&P500 tickers
