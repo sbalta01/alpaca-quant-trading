@@ -16,7 +16,7 @@ API_KEY    = os.getenv("APCA_API_KEY_ID")
 API_SECRET = os.getenv("APCA_API_SECRET_KEY")
 BASE_URL   = "https://paper-api.alpaca.markets"
 
-UNIVERSE   = "SPY"  # or load a list of S&P500 tickers
+UNIVERSE   = "IEX"  # or load a list of S&P500 tickers
 NUM_TOP    = 10
 MOMENTUM_DAYS = 126  # ~6 months
 MAX_EXPOSURE = 0.9
@@ -25,11 +25,12 @@ STOP_LOSS_PCT = 0.15
 api = REST(API_KEY, API_SECRET, BASE_URL, api_version='v2')
 
 def get_universe_tickers():
-    # For demo: use SPY holdings via Alpaca
-    sp = api.get_asset("SPY")
+    # For demo: use IEX holdings via Alpaca
+    # sp = api.get_asset("IEX")
     # Alternatively, load static CSV of S&P500 tickers
-    return [t.symbol for t in api.list_assets(asset_class="us_equity") 
-            if t.symbol in pd.read_csv("sp500.csv")["Symbol"].tolist()]
+    # return [t.symbol for t in api.list_assets(asset_class="us_equity") 
+            # if t.symbol in pd.read_csv("sp500.csv")["Symbol"].tolist()]
+    return pd.read_csv("sp500.csv")["Symbol"].tolist()
 
 def fetch_price_data(tickers):
     end_dt = datetime.now(pytz.UTC)
@@ -41,8 +42,7 @@ def fetch_price_data(tickers):
     end=end_dt.isoformat(),
     feed='iex'
 ).df
-
-    # bars is a MultiIndex DataFrame: (timestamp, symbol)
+    bars = bars.set_index(['symbol'], append =True)# now bars is a MultiIndex DataFrame: (timestamp, symbol)
     return bars['close'].unstack(level=1)
 
 def compute_momentum(df):
@@ -64,23 +64,35 @@ def risk_trim(symbol):
             api.submit_order(symbol=symbol, qty=qty, side='sell',
                              type='market', time_in_force='day')
 
+from alpaca_trade_api.rest import TimeFrame
+
 def rebalance(targets):
-    # 1) Liquidate unwanted
+    # 1) Liquidate unwanted positions
     current = {p.symbol: float(p.qty) for p in api.list_positions()}
     for sym in current:
         if sym not in targets:
-            api.submit_order(symbol=sym, qty=current[sym], side='sell',
-                             type='market', time_in_force='day')
+            api.submit_order(
+                symbol=sym, qty=current[sym], side='sell',
+                type='market', time_in_force='day'
+            )
+
     # 2) Send target orders
     account = api.get_account()
     cash = float(account.cash)
+
     for sym, w in targets.items():
         alloc = cash * w
-        bar = api.get_barset(sym, TimeFrame.Day, limit=1).df[sym].iloc[-1]
+        # Fetch the latest bar using get_bars
+        bars = api.get_bars(sym, TimeFrame.Day, limit=1).df
+        bar = bars.iloc[-1]  # There should only be one row
         qty = int(alloc / bar.close)
+
         if qty > 0:
-            api.submit_order(symbol=sym, qty=qty, side='buy',
-                             type='market', time_in_force='day')
+            api.submit_order(
+                symbol=sym, qty=qty, side='buy',
+                type='market', time_in_force='day'
+            )
+
 
 def main():
     tickers = get_universe_tickers()
