@@ -6,6 +6,12 @@ import pytz
 from alpaca_trade_api.rest import REST, TimeFrame
 
 # ── CONFIG ─────────────────────────────────────────────────────────
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv(dotenv_path=Path('.') / '.env')
+
+
 API_KEY    = os.getenv("APCA_API_KEY_ID")
 API_SECRET = os.getenv("APCA_API_SECRET_KEY")
 BASE_URL   = "https://paper-api.alpaca.markets"
@@ -28,7 +34,14 @@ def get_universe_tickers():
 def fetch_price_data(tickers):
     end_dt = datetime.now(pytz.UTC)
     start_dt = end_dt - timedelta(days=MOMENTUM_DAYS + 30)
-    bars = api.get_bars(tickers, TimeFrame.Day, start=start_dt.isoformat(), end=end_dt.isoformat()).df
+    bars = api.get_bars(
+    tickers,
+    TimeFrame.Day,
+    start=start_dt.isoformat(),
+    end=end_dt.isoformat(),
+    feed='iex'
+).df
+
     # bars is a MultiIndex DataFrame: (timestamp, symbol)
     return bars['close'].unstack(level=1)
 
