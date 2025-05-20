@@ -5,26 +5,26 @@
 A lightweight, extensible Python framework for strategy development, backtesting, and live execution.
 
 ## 📂 Project Structure
-```bash
-alpaca-quant-trading/
-├── src/
-│ ├── config.py
-│ ├── data/
-│ ├── strategies/
-│ │ ├── init.py
-│ │ ├── base_strategy.py
-│ │ ├── moving_average.py
-│ │ └── rsi.py
-│ ├── backtesting/
-│ ├── execution/
-│ └── utils/
-├── examples/
-│ ├── backtest_moving_avg.py
-│ └── live_run_moving_avg.py
-├── tests/
-├── .gitignore
-├── requirements.txt
-└── README.md
+    ```bash
+    alpaca-quant-trading/
+    ├── src/
+    │ ├── config.py
+    │ ├── data/
+    │ ├── strategies/
+    │ │ ├── init.py
+    │ │ ├── base_strategy.py
+    │ │ ├── moving_average.py
+    │ │ └── rsi.py
+    │ ├── backtesting/
+    │ ├── execution/
+    │ └── utils/
+    ├── examples/
+    │ ├── backtest_moving_avg.py
+    │ └── live_run_moving_avg.py
+    ├── tests/
+    ├── .gitignore
+    ├── requirements.txt
+    └── README.md
 
 
 
