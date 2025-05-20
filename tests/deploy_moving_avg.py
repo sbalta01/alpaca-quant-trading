@@ -8,8 +8,8 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 from datetime import datetime, timedelta, timezone
 import pandas as pd
 
-from src.config import APCA_API_KEY_ID as API_KEY
-from src.config import APCA_API_SECRET_KEY as API_SECRET
+from src.config import API_KEY 
+from src.config import API_SECRET 
 
     
 PAPER = True  # Set to False for live trading
