@@ -8,16 +8,9 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 from datetime import datetime, timedelta
 import pandas as pd
 
-# ── CONFIG ─────────────────────────────────────────────────────────
-from dotenv import load_dotenv
-from pathlib import Path
+from src.config import APCA_API_KEY_ID as API_KEY
+from src.config import APCA_API_SECRET_KEY as API_SECRET
 
-load_dotenv(dotenv_path=Path('.') / '.env')
-
-
-API_KEY    = os.getenv("APCA_API_KEY_ID")
-API_SECRET = os.getenv("APCA_API_SECRET_KEY")
-BASE_URL   = "https://paper-api.alpaca.markets"
 
 PAPER = True  # Set to False for live trading
 

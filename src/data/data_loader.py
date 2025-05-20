@@ -1,3 +1,5 @@
+### Load historical data, bars
+
 import pandas as pd
 
 def fetch_sp500_symbols():
@@ -6,4 +8,4 @@ def fetch_sp500_symbols():
     df[['Symbol']].to_csv('sp500.csv', index=False)
     print("sp500.csv created with", len(df), "symbols.")
 
-fetch_sp500_symbols()
+fetch_sp500_symbols() ## Load SP500 symbols

@@ -1,2 +1,5 @@
 Secret key.txt
 .env
+.venv
+config.py
+__pycache__/
