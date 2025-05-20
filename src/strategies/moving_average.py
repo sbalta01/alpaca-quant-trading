@@ -23,19 +23,19 @@ class MovingAverageStrategy(Strategy):
         Given a DataFrame with at least a 'close' column, compute:
           - 'sma_short': rolling mean over short_window
           - 'sma_long': rolling mean over long_window
-          - 'signal':  1.0 when sma_short > sma_long, 0.0 otherwise
-          - 'positions': difference of 'signal' to mark entry/exit
+          - 'position':  1.0 when sma_short > sma_long, 0.0 otherwise
+          - 'signal': difference of 'signal' to mark entry/exit
         Returns a DataFrame with these additional columns.
         """
         df = data.copy()
         df['sma_short'] = sma(df['close'], self.short_window)
         df['sma_long']  = sma(df['close'], self.long_window)
 
-        # Generate raw signals
-        df['signal'] = 0.0
-        df.loc[df['sma_short'] > df['sma_long'], 'signal'] = 1.0
+        # Generate raw positions
+        df['position'] = 0.0
+        df.loc[df['sma_short'] > df['sma_long'], 'position'] = 1.0
 
         # Generate trading orders: +1 for a buy, -1 for a sell
-        df['positions'] = df['signal'].diff().fillna(0)
+        df['signal'] = df['position'].diff().fillna(0)
 
         return df
