@@ -1,3 +1,4 @@
+alpaca-py>=1.0.0
 pandas
 matplotlib
-alpaca-py
+numpy
