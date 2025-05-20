@@ -5,7 +5,6 @@
 A lightweight, extensible Python framework for strategy development, backtesting, and live execution.
 
 ## 📂 Project Structure
-    ```bash
     alpaca-quant-trading/
     ├── src/
     │ ├── config.py
