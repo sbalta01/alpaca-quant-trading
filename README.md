@@ -5,7 +5,7 @@
 A lightweight, extensible Python framework for strategy development, backtesting, and live execution.
 
 ## 📂 Project Structure
-
+```bash
 alpaca-quant-trading/
 ├── src/
 │ ├── config.py
@@ -35,7 +35,9 @@ alpaca-quant-trading/
    git clone https://github.com/sbalta01/alpaca-quant-trading
    cd alpaca-quant-trading
 2. Virtual environment
+    ```bash
     python -m venv venv
     source venv/bin/activate    # Windows: venv\Scripts\activate
 3. Install dependencies
+    ```bash
     pip install -r requirements.txt
