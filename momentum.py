@@ -82,6 +82,7 @@ def rebalance(targets):
 
     for sym, w in targets.items():
         alloc = cash * w
+        print(sym)
         # Fetch the latest bar using get_bars
         bars = api.get_bars(sym, TimeFrame.Day, limit=1).df
         bar = bars.iloc[-1]  # There should only be one row
