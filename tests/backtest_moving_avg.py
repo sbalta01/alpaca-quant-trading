@@ -1,46 +1,51 @@
-import os
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest, CryptoBarsRequest
-from alpaca.data.timeframe import TimeFrame
-from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
-from datetime import datetime, timedelta, timezone
+# examples/backtest_moving_avg.py
+
+import sys, os
+from datetime import datetime
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pandas as pd
 
-# ── CONFIG ─────────────────────────────────────────────────────────
-from dotenv import load_dotenv
-from pathlib import Path
+from src.data.data_loader import fetch_alpaca_data
+from src.strategies.moving_average import MovingAverageStrategy
+from src.backtesting.backtester import BacktestEngine
+from alpaca.data.timeframe import TimeFrame
 
-load_dotenv(dotenv_path=Path('.') / '.env')
+from src.backtesting.visualizer import plot_equity, plot_signals
 
+def main():
+    # ————————————————————————
+    # Fetch data from Alpaca
+    # ————————————————————————
+    symbol = "AAPL"
+    start  = datetime(2025, 1, 1)
+    end    = datetime(2025, 5, 1)
+    data = fetch_alpaca_data(symbol, start, end, timeframe=TimeFrame.Day)
 
-API_KEY    = os.getenv("APCA_API_KEY_ID")
-API_SECRET = os.getenv("APCA_API_SECRET_KEY")
-BASE_URL   = "https://paper-api.alpaca.markets"
+    # ————————————————————————
+    # Configure & run strategy
+    # ————————————————————————
+    strategy = MovingAverageStrategy(short_window=10, long_window=20)
+    engine   = BacktestEngine(strategy, data, initial_cash=10_000)
+    results  = engine.run()
 
-PAPER = True  # Set to False for live trading
+    # ————————————————————————
+    # Report
+    # ————————————————————————
 
-# Clients
-trading_client = TradingClient(API_KEY, API_SECRET, paper=PAPER)
-data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
+    print(f"\n=== Backtest: {strategy.name} {symbol} ===")
+    print(f"Period      : {start.date()} → {end.date()}")
+    print(f"Initial Cash: {engine.initial_cash:.2f}")
+    print(f"Final Equity: {results['equity'].iloc[-1]:.2f}")
+    print(f"Return (%)  : {(results['equity'].iloc[-1] / engine.initial_cash - 1) * 100:.2f}%\n")
+    print(results[['close','sma_short','sma_long','position','signal','equity']].tail(10))
 
-##Strategy: moving average crossover
+    # Equity curve
+    plot_equity(results, title=f"{strategy.name} Equity Curve")
 
-def get_bars(symbol: str, days=1):
-    start = datetime(2025, 5, 19, 13, 00, tzinfo=timezone.utc) #NYSE is open 13:00 to 20:00 UTC 
-    end = start + timedelta(days=days)
+    # Price with entry/exit markers
+    plot_signals(results, price_col='close', signal_col='signal',
+                title=f"{strategy.name} Signals on Price")
 
-    request_params = StockBarsRequest(
-        symbol_or_symbols=symbol,
-        timeframe=TimeFrame.Minute, #Compute bars every minute
-        start=start,
-        end=end,
-        feed= "iex", #Free plan
-    )
-    bars = data_client.get_stock_bars(request_params).df
-    return bars[bars.index.get_level_values(0) == symbol]
-
-aapl_bars = get_bars("AAPL")
-
-print(aapl_bars)
+if __name__ == "__main__":
+    main()
