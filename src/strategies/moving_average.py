@@ -1,11 +1,7 @@
 # src/strategies/moving_average.py
-import sys
 
-print(sys.path)
-
-
-from .base_strategy import Strategy
-from ..utils.indicators import sma
+from src.strategies.base_strategy import Strategy
+from src.utils.indicators import sma
 import pandas as pd
 
 class MovingAverageStrategy(Strategy):
