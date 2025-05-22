@@ -10,11 +10,11 @@ from src.backtesting.visualizer import plot_equity, plot_signals
 
 if __name__ == "__main__":
     symbols = ["AAPL", "AMZN"]
-    start   = datetime(2025, 1, 1)
+    start   = datetime(2023, 1, 1)
     end     = datetime(2025, 5, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    strat = MovingAverageStrategy(short_window=1, long_window=5)
+    strat = MovingAverageStrategy(short_window=20, long_window=100, ma = 'sma')
     results = run_backtest_strategy(
         strategy=strat,
         symbols=symbols,
@@ -24,7 +24,7 @@ if __name__ == "__main__":
         initial_cash=10_000
     )
 
-    # print(results[['close','sma_short','sma_long','position','signal','equity']].groupby(level=0).tail(10))
+    # print(results[['close','position','signal','equity']].groupby(level=0).tail(10))
 
     # Plot the equity curve
     plot_equity(results, title=f"{strat.name} Equity Curve")
