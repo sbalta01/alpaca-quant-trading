@@ -16,7 +16,8 @@ def run_backtest_strategy(
     start: datetime,
     end: datetime,
     timeframe: Union[pd.Timedelta, object],  # e.g. TimeFrame.Day. Fetch data time frame.
-    initial_cash: float = 10_000.0
+    initial_cash: float = 10_000.0,
+    feed: str = 'iex'
 ) -> pd.DataFrame:
     """
     Run a backtest of `strategy` on `symbols` between `start` and `end`.
@@ -40,7 +41,8 @@ def run_backtest_strategy(
         symbol=symbols,
         start=start,
         end=end,
-        timeframe=timeframe
+        timeframe=timeframe,
+        feed = feed
     )
     
     # 2) Initialize and run backtest
