@@ -61,7 +61,7 @@ def run_backtest_strategy(
     print(f"Initial Cash : {initial_cash:,.2f}")
     print(f"Final Equity : {results['equity'].iloc[-1]:,.2f}")
     print(f"Net P&L      : {pnl:,.2f}")
-    print(f"Return (%)   : {ret:,.2f}%\n")
+    print(f"Return (%)   : {ret:,.2f}%")
     print(f"Return Control (%)   : {ret_control:,.2f}%\n")
     
     return results
