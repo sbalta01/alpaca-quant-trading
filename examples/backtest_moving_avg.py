@@ -14,7 +14,7 @@ if __name__ == "__main__":
     end     = datetime(2025, 5, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    strat = MovingAverageStrategy(short_window=5, long_window=20)
+    strat = MovingAverageStrategy(short_window=1, long_window=5)
     results = run_backtest_strategy(
         strategy=strat,
         symbols=symbols,
@@ -24,7 +24,7 @@ if __name__ == "__main__":
         initial_cash=10_000
     )
 
-    print(results[['close','sma_short','sma_long','position','signal','equity']].groupby(level=0).tail(10))
+    # print(results[['close','sma_short','sma_long','position','signal','equity']].groupby(level=0).tail(10))
 
     # Plot the equity curve
     plot_equity(results, title=f"{strat.name} Equity Curve")
