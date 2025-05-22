@@ -37,7 +37,7 @@ class RandomForestStrategy(Strategy):
         df = df.dropna()
 
         # 2) Labels: 1 if next-day return > 0, else 0
-        df["label"] = (df["close"].shift(-1).pct_change() > 0).astype(int)
+        df["label"] = (df["close"].shift(-1).pct_change(fill_method=None) > 0).astype(int)
         df = df.dropna()
 
         # 3) Split train / test
