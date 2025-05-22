@@ -25,7 +25,7 @@ def fetch_alpaca_data(
     start: datetime,
     end: datetime,
     timeframe: TimeFrame = TimeFrame.Day,
-    feed = 'iex'
+    feed: str = 'iex'
 ) -> pd.DataFrame:
     """
     Fetch historical bars from Alpaca between start and end.
