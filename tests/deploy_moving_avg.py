@@ -1,88 +1,142 @@
-import os
+# src/execution/live_executor.py
+
+import time
+from datetime import datetime, timedelta, timezone
+from typing import Union, List
+
+import pandas as pd
+
 from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest, CryptoBarsRequest
+from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
-from datetime import datetime, timedelta, timezone
-import pandas as pd
 
-from src.config import API_KEY 
-from src.config import API_SECRET 
+from src.config import API_KEY, API_SECRET
 
-    
-PAPER = True  # Set to False for live trading
+# Paper vs Live
+PAPER = True
 
-# Clients
+# Alpaca clients
 trading_client = TradingClient(API_KEY, API_SECRET, paper=PAPER)
-data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
+data_client    = StockHistoricalDataClient(API_KEY, API_SECRET)
 
-##Strategy: moving average crossover
 
-def get_bars(symbol: str, minutes=30):
-    # Get minute-long bars from 'minutes' ago to compute the moving avg.
-    # 30 minutes suffices because all we want is moving avg 5 to 20.
-    end = datetime.now()
-    # end = datetime(2025,5,20,20,00,tzinfo=timezone.utc)
+def get_bars(
+    symbols: Union[str, List[str]],
+    minutes: int = 30,
+    feed: str = "iex"
+) -> pd.DataFrame:
+    """
+    Fetch minute-bars for one or more symbols over the past `minutes`.
+    Returns a DataFrame with MultiIndex (symbol, timestamp).
+    """
+    if isinstance(symbols, str):
+        symbols_list = [symbols]
+    else:
+        symbols_list = symbols
+
+    end = datetime(2025,5,20,20,00,tzinfo=timezone.utc)
+    # end   = datetime.now(timezone.utc)
     start = end - timedelta(minutes=minutes)
 
-    request_params = StockBarsRequest(
-        symbol_or_symbols=symbol,
+    req = StockBarsRequest(
+        symbol_or_symbols=symbols_list,
         timeframe=TimeFrame.Minute,
         start=start,
         end=end,
-        feed= "iex",
+        feed=feed,
     )
-    bars = data_client.get_stock_bars(request_params).df
-    return bars[bars.index.get_level_values(0) == symbol]
+    bars = data_client.get_stock_bars(req).df
+    # bars has MultiIndex [symbol, timestamp]
+    return bars.sort_index()
 
 
-def moving_average_strategy(symbol="AAPL"):
+def _run_for_symbol(symbol: str):
+    """
+    Core strategy for one symbol.
+    """
+    # 1) Fetch bars
     bars = get_bars(symbol)
-    if bars.shape[0] < 21: #because our strategy is moving avg crossover 5 to 20
-        print("Not enough data yet.")
+
+    # 2) If insufficient data, skip
+    if bars.xs(symbol, level=0).shape[0] < 20 + 1:
+        print(f"[{symbol}] Not enough data yet.")
         return
 
-    bars["SMA5"] = bars["close"].rolling(window=5).mean()
-    bars["SMA20"] = bars["close"].rolling(window=20).mean()
+    # 3) Compute indicators
+    df = bars.xs(symbol, level=0).copy()
+    df["sma_short"] = df["close"].rolling(window=5).mean()
+    df["sma_long"]  = df["close"].rolling(window=20).mean()
 
-    last = bars.iloc[-1]
-    prev = bars.iloc[-2]
+    latest = df.iloc[-1]
+    prev   = df.iloc[-2]
 
+    # 4) Check current Alpaca position
     try:
-        position = trading_client.get_open_position(symbol) #It returns whatever stock (or asset) I currently own
-    except:
-        position = []
-    currently_holding = any(p.symbol == symbol for p in position)
+        open_positions = trading_client.get_open_positions()
+    except Exception:
+        open_positions = []
 
+    holding = any(p.symbol == symbol for p in open_positions)
 
-    if prev.SMA5 < prev.SMA20 and last.SMA5 > last.SMA20 and not currently_holding:
-        print("Buy signal")
+    # 5) Generate and act on signals
+    # signal == +1 → buy, -1 → sell
+    signal = 0
+    if prev.sma_short < prev.sma_long and latest.sma_short > latest.sma_long and not holding:
+        signal = 1
+    elif prev.sma_short > prev.sma_long and latest.sma_short < latest.sma_long and holding:
+        signal = -1
+
+    if signal == 1:
+        print(f"[{symbol}] Buy signal at {latest.name}, price {latest.close}")
         order = MarketOrderRequest(
             symbol=symbol,
             qty=1,
             side=OrderSide.BUY,
-            time_in_force=TimeInForce.GTC #When the order is going to be cancelled. 'GTC' = Good Till Canceled
+            time_in_force=TimeInForce.GTC,
         )
         trading_client.submit_order(order)
-    elif prev.SMA5 > prev.SMA20 and last.SMA5 < last.SMA20 and currently_holding:
-        print("Sell signal")
+
+    elif signal == -1:
+        print(f"[{symbol}] Sell signal at {latest.name}, price {latest.close}")
         order = MarketOrderRequest(
             symbol=symbol,
             qty=1,
             side=OrderSide.SELL,
-            time_in_force=TimeInForce.GTC
+            time_in_force=TimeInForce.GTC,
         )
         trading_client.submit_order(order)
-    else:
-        print("No trade signal.")
 
-import time
+    else:
+        print(f"[{symbol}] No trade signal at {latest.name}.")
+
+
+def run_live(
+    symbols: Union[str, List[str]],
+    interval: int = 60
+):
+    """
+    Polls market every `interval` seconds and runs the MA crossover strategy 
+    on each symbol (str or list of str).
+    """
+    if isinstance(symbols, str):
+        symbol_list = [symbols]
+    else:
+        symbol_list = symbols
+
+    while True:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        print(f"\nChecking market at {now} for {symbol_list}")
+        for sym in symbol_list:
+            _run_for_symbol(sym)
+        time.sleep(interval)
+
 
 if __name__ == "__main__":
-    while True:
-        print(f"Checking market at {datetime.now()}")
-        moving_average_strategy("AAPL")
-        time.sleep(60)
+    # Example usage: either a single symbol...
+    # run_live("AAPL")
 
+    # ...or multiple symbols:
+    run_live(["AAPL", "MSFT", "GOOG"])
