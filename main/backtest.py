@@ -23,12 +23,12 @@ if __name__ == "__main__":
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
     strat = RollingWindowStrategy(
-    train_window=252,        # use ~1 year of daily bars
-    retrain_every=5,         # retrain weekly
-    n_estimators=200,
-    max_depth=3,
-    random_state=42
-)
+        train_window=252,        # use ~1 year of daily bars
+        retrain_every=5,         # retrain weekly
+        n_estimators=200,
+        max_depth=3,
+        random_state=42
+    )
     results = run_backtest_strategy(
         strategy=strat,
         symbols=symbols,
@@ -38,8 +38,6 @@ if __name__ == "__main__":
         initial_cash=10_000,
         feed = None
     )
-
-    # print(results[['close','position','signal','equity']].groupby(level=0).tail(10))
 
     # Plot the equity curve
     plot_equity(results, title=f"{strat.name} Equity Curve")

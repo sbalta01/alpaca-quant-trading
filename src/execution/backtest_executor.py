@@ -9,13 +9,14 @@ from src.data.data_loader import fetch_alpaca_data
 from src.backtesting.backtester import BacktestEngine
 from src.strategies.base_strategy import Strategy
 from src.strategies.buy_and_hold import BuyAndHoldStrategy
+from alpaca.data.timeframe import TimeFrame
 
 def run_backtest_strategy(
     strategy: Strategy,
     symbols: Union[str, List[str]],
     start: datetime,
     end: datetime,
-    timeframe: Union[pd.Timedelta, object],  # e.g. TimeFrame.Day. Fetch data time frame.
+    timeframe: TimeFrame,  # e.g. TimeFrame.Day. Fetch data time frame.
     initial_cash: float = 10_000.0,
     feed: str = 'iex'
 ) -> pd.DataFrame:
@@ -28,7 +29,7 @@ def run_backtest_strategy(
     symbols  : str or list of str
     start    : datetime
     end      : datetime
-    timeframe: alpaca TimeFrame or pandas Timedelta
+    timeframe: alpaca TimeFrame
     initial_cash: float
     
     Returns
