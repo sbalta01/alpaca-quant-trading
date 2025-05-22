@@ -8,6 +8,7 @@ import pandas as pd
 from src.data.data_loader import fetch_alpaca_data
 from src.backtesting.backtester import BacktestEngine
 from src.strategies.base_strategy import Strategy
+from src.strategies.buy_and_hold import BuyAndHoldStrategy
 
 def run_backtest_strategy(
     strategy: Strategy,
@@ -45,15 +46,22 @@ def run_backtest_strategy(
     # 2) Initialize and run backtest
     engine = BacktestEngine(strategy=strategy, data=df, initial_cash=initial_cash)
     results = engine.run()
+
+    engine_control = BacktestEngine(strategy=BuyAndHoldStrategy(), data=df, initial_cash=initial_cash)
+    results_control = engine_control.run()
+
     
     # 3) Print summary
     pnl = results["equity"].iloc[-1] - initial_cash
     ret = pnl / initial_cash * 100.0
+    pnl_control = results_control["equity"].iloc[-1] - initial_cash
+    ret_control = pnl_control / initial_cash * 100.0
     print(f"--- Backtest: {strategy.name} on {symbols} ---")
     print(f"Period       : {start.date()} → {end.date()}")
     print(f"Initial Cash : {initial_cash:,.2f}")
     print(f"Final Equity : {results['equity'].iloc[-1]:,.2f}")
     print(f"Net P&L      : {pnl:,.2f}")
     print(f"Return (%)   : {ret:,.2f}%\n")
+    print(f"Return Control (%)   : {ret_control:,.2f}%\n")
     
     return results
