@@ -31,7 +31,8 @@ def run_live_strategy(
     symbols: Union[str, List[str]],
     timeframe: TimeFrame,
     lookback_minutes: int = 30, #data retrieval
-    interval_seconds: int = 60, #update time
+    interval_seconds: int = 60, #update time,
+    cash_per_trade: float = 1000,
     feed: str = "iex"
 ):
     """
@@ -86,15 +87,21 @@ def run_live_strategy(
             # 4) Check current position
             open_pos = trading_client.get_all_positions()
             holding = any(p.symbol == symbol for p in open_pos)
-
+            qty = 0
+            if holding:
+                position = trading_client.get_open_position(symbol)
+                qty = position.qty
+                qty_available = position.qty_available
             # 5) Act on signal
-            if sig == 1 and not holding:
+            # if sig == 1 and not holding:
+            if sig == 1: #Remove the condition that I can't buy if I already own stock
                 print(f"[{symbol}] BUY at {latest.name} price={latest.close:.2f}")
                 order = MarketOrderRequest(
                     symbol=symbol,
-                    qty=1,
+                    # qty=1,
+                    notional = cash_per_trade,
                     side=OrderSide.BUY,
-                    time_in_force=TimeInForce.GTC
+                    time_in_force=TimeInForce.DAY #Operate during open hours or else cancel. GTC if I want good till canceled.
                 )
                 trading_client.submit_order(order)
                 tracker.record_trade(latest.name, symbol, 1, "buy", latest.close)
@@ -103,15 +110,16 @@ def run_live_strategy(
                 print(f"[{symbol}] SELL at {latest.name} price={latest.close:.2f}")
                 order = MarketOrderRequest(
                     symbol=symbol,
-                    qty=1,
+                    qty=qty_available, #Sell all shares owned
+                    # notional = cash_per_trade,
                     side=OrderSide.SELL,
-                    time_in_force=TimeInForce.GTC
+                    time_in_force=TimeInForce.DAY
                 )
                 trading_client.submit_order(order)
                 tracker.record_trade(latest.name, symbol, 1, "sell", latest.close)
 
             else:
-                print(f"[{symbol}] No trade signal (signal={sig}, holding={holding}).")
+                print(f"[{symbol}] No trade signal (signal={sig}, holding={holding}, qty={qty}).")
 
         open_positions = trading_client.get_all_positions()
         tracker.update_equity(open_positions)
