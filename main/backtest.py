@@ -4,6 +4,7 @@ from datetime import datetime
 from alpaca.data.timeframe import TimeFrame
 
 from src.strategies.moving_average import MovingAverageStrategy
+from src.strategies.bollinger_mean_reversion import BollingerMeanReversionStrategy
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_equity, plot_signals
 
@@ -14,7 +15,8 @@ if __name__ == "__main__":
     end     = datetime(2025, 5, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    strat = MovingAverageStrategy(short_window=20, long_window=100, ma = 'sma')
+    # strat = MovingAverageStrategy(short_window=20, long_window=100, ma = 'sma')
+    strat = BollingerMeanReversionStrategy(window=20, k=2,)
     results = run_backtest_strategy(
         strategy=strat,
         symbols=symbols,
