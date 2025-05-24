@@ -93,8 +93,7 @@ def run_live_strategy(
                 qty = position.qty
                 qty_available = position.qty_available
             # 5) Act on signal
-            # if sig == 1 and not holding:
-            if sig == 1: #Remove the condition that I can't buy if I already own stock
+            if sig == 1 and not holding: #I can't buy if I already own stock
                 print(f"[{symbol}] BUY at {latest.name} price={latest.close:.2f}")
                 order = MarketOrderRequest(
                     symbol=symbol,
@@ -111,7 +110,6 @@ def run_live_strategy(
                 order = MarketOrderRequest(
                     symbol=symbol,
                     qty=qty_available, #Sell all shares owned
-                    # notional = cash_per_trade,
                     side=OrderSide.SELL,
                     time_in_force=TimeInForce.DAY
                 )

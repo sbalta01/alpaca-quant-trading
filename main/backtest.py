@@ -12,23 +12,23 @@ from src.strategies.rolling_window_ML import RollingWindowStrategy
 
 
 if __name__ == "__main__":
-    # symbols = ["AAPL", "AMZN"]
+    symbols = ["AAPL", "MSFT"]
     # symbols = "USO"
-    symbols = "SPY"
-    start   = datetime(2001, 1, 1)
+    # symbols = "SPY"
+    start   = datetime(2025, 5, 22)
     end     = datetime(2025, 5, 1)
-    timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
+    timeframe = TimeFrame.Minute  # or pd.Timedelta(days=1)
 
-    # strat = MovingAverageStrategy(short_window=20, long_window=100, ma = 'sma')
+    strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'ema')
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
-    strat = RollingWindowStrategy(
-        train_window=252,        # use ~1 year of daily bars
-        retrain_every=5,         # retrain weekly
-        n_estimators=200,
-        max_depth=3,
-        random_state=42
-    )
+    # strat = RollingWindowStrategy(
+    #     train_window=252,        # use ~1 year of daily bars
+    #     retrain_every=5,         # retrain weekly
+    #     n_estimators=200,
+    #     max_depth=3,
+    #     random_state=42
+    # )
     results = run_backtest_strategy(
         strategy=strat,
         symbols=symbols,
