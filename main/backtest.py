@@ -13,14 +13,14 @@ from src.strategies.rolling_window_ML import RollingWindowStrategy
 
 
 if __name__ == "__main__":
-    symbols = ["AAPL", "MSFT"]
+    # symbols = ["AAPL"]
     # symbols = "USO"
-    # symbols = "SPY"
-    start   = datetime(2021, 1, 1)
-    end     = datetime(2024, 1, 1)
+    symbols = "SPY"
+    start   = datetime(2015, 1, 1)
+    end     = datetime(2024, 5, 24)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    # strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'ema')
+    # strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'sma')
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
     # strat = RollingWindowStrategy(
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         end=end,
         timeframe=timeframe,
         initial_cash=10_000,
-        feed = "iex"
+        feed = "sip"
     )
 
     # Plot the equity curve

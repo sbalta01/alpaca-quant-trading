@@ -68,8 +68,8 @@ def plot_signals(
         ax.plot(df.index, df[price_col], label=label or "Price")
         buys  = df[df[signal_col] ==  1.0]
         sells = df[df[signal_col] == -1.0]
-        ax.scatter(buys.index,  buys[price_col], marker="^", label=f"{label} Buy" if label else "Buy",  s=50)
-        ax.scatter(sells.index, sells[price_col], marker="v", label=f"{label} Sell" if label else "Sell", s=50)
+        ax.scatter(buys.index,  buys[price_col], marker="^", color = "olive", label=f"{label} Buy" if label else "Buy",  s=50)
+        ax.scatter(sells.index, sells[price_col], marker="v", color = "darkslategrey",label=f"{label} Sell" if label else "Sell", s=50)
     
     if isinstance(results.index, pd.MultiIndex):
         # Loop per symbol

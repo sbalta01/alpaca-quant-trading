@@ -37,7 +37,7 @@ def run_live_strategy(
 ):
     """
     Poll market every `interval_seconds`:
-      1) Fetch last `lookback_minutes` of minute-bars
+      1) Fetch last `lookback_minutes` of timeframe-bars
       2) Call strategy.generate_signals for each symbol
       3) Submit orders based on the latest signal (+1 buy, -1 sell)
     
@@ -62,7 +62,7 @@ def run_live_strategy(
         # end = datetime(2025,5,20,20,00,tzinfo=timezone.utc)
         # start = end - timedelta(minutes=lookback_minutes)
 
-        # 1) Fetch minute bars via your data loader
+        # 1) Fetch timeframe bars via your data loader
         bars = fetch_alpaca_data(
             symbol=symbols,
             start=start,
