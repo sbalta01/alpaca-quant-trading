@@ -35,6 +35,7 @@ class BacktestEngine:
         """
         Run backtest for ONE symbol (DatetimeIndex).
         """
+        print(df)
         df = self.strategy.generate_signals(df).copy()
 
         # Initialize
