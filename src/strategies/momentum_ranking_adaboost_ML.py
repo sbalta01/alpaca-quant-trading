@@ -2,20 +2,17 @@
 
 import pandas as pd
 import numpy as np
-from typing import Tuple
+from typing import Tuple, List, Dict
 from joblib import Parallel, delayed
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
 
 from src.strategies.base_strategy import Strategy
-from src.strategies.adaboost_ML import AdaBoostStrategy
-
+from src.strategies.adaboost_ML  import AdaBoostStrategy
 
 class MomentumRankingAdaBoostStrategy(Strategy):
     """
-    Cross‐sectional ranking of a universe by next‐bar MA(d) up‐move probability,
-    as predicted by AdaBoostMAPredictor, generating a full signal series:
-      - signal = +1 for the top_k symbols on each date
-      - signal =  0 otherwise
+    Train each symbol's AdaBoostMAPredictor once, then at each test timestamp
+    rank symbols by predicted up‐move probability and go long the top_k.
     """
     name = "MomentumRankingAdaBoost"
     multi_symbol = True
@@ -24,102 +21,97 @@ class MomentumRankingAdaBoostStrategy(Strategy):
         self,
         predictor: AdaBoostStrategy,
         top_k: int = 10,
-        n_jobs: int = -1,
+        n_jobs: int = -1
     ):
-        """
-        predictor : a configured AdaBoostMAPredictor
-        top_k     : how many symbols to go long each day
-        n_jobs    : parallel jobs for probability estimation
-        """
         self.predictor = predictor
         self.top_k = top_k
         self.n_jobs = n_jobs
+        self.train_frac = self.predictor.train_frac
 
-    def _predict_prob(
-        self,
-        symbol: str,
-        df_sym: pd.DataFrame
-    ) -> Tuple[str, float]:
+    def _fit_symbol(self, symbol: str, df_sym: pd.DataFrame) -> Tuple[str, List[pd.Timestamp], np.ndarray]:
         """
-        Train & tune on history up to the last row of df_sym,
-        then return (symbol, prob_up_next_bar).
+        Fit on the train slice of df_sym, then return:
+          - symbol
+          - test timestamps
+          - array of predicted probabilities for each test timestamp
         """
-        try:
-            # Build features & target
-            feat = self.predictor._compute_features(df_sym)
-            feat["target"] = np.sign(
-                feat[f"MA{self.predictor.d}"].shift(-1) -
-                feat[f"MA{self.predictor.d}"]
-            )
-            feat = feat.dropna(subset=["target"])
-            split = int(len(feat) * self.predictor.train_frac)
-            train = feat.iloc[:split]
-            test  = feat.iloc[split:]
-
-            X_train = train.drop(columns=["open","high","low","close","volume","target"])
-            y_train = train["target"].astype(int)
-            # predict for the very last available row:
-            X_pred = test.drop(columns=["open","high","low","close","volume","target"]).iloc[[-1]]
-
-            # time-series CV grid search
-            tscv = TimeSeriesSplit(n_splits=self.predictor.cv_splits)
-            gs = GridSearchCV(
-                self.predictor.pipeline,
-                self.predictor.param_grid,
-                cv=tscv,
-                scoring="accuracy",
-                n_jobs=1
-            )
-            gs.fit(X_train, y_train)
-            prob_up = gs.best_estimator_.predict_proba(X_pred)[0,1]
-            return symbol, float(prob_up)
-        except Exception:
-            return symbol, 0.0
+        # 1) Build features & target
+        feat = self.predictor._compute_features(df_sym)
+        feat["target"] = np.sign(
+            feat[f"MA{self.predictor.d}"].shift(-1) - feat[f"MA{self.predictor.d}"]
+        )
+        feat = feat.dropna(subset=["target"])
+        # 2) Split train / test
+        split = int(len(feat) * self.predictor.train_frac)
+        train = feat.iloc[:split]
+        test  = feat.iloc[split:]
+        # 3) Prepare arrays
+        X_train = train.drop(columns=["open","high","low","close","volume","target"])
+        y_train = train["target"].astype(int)
+        X_test  = test.drop(columns=["open","high","low","close","volume","target"])
+        timestamps_test = list(test.index)
+        # 4) Grid-search once per symbol
+        tscv = TimeSeriesSplit(n_splits=self.predictor.cv_splits)
+        gs = GridSearchCV(
+            self.predictor.pipeline,
+            self.predictor.param_grid,
+            cv=tscv,
+            scoring="accuracy",
+            n_jobs=1
+        )
+        gs.fit(X_train, y_train)
+        # 5) Predict probabilities for all test rows
+        probs = gs.best_estimator_.predict_proba(X_test)[:,1]
+        return symbol, timestamps_test, probs
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        data : MultiIndex ['symbol','timestamp'] with price & volume
-        returns: same MultiIndex with 'signal' column for every timestamp
+        data: MultiIndex ['symbol','timestamp'] → must include 'close','volume',etc.
+        Returns full MultiIndex signals over all timestamps and symbols.
         """
-        df = data.copy()
-        if not isinstance(df.index, pd.MultiIndex) \
-           or df.index.names != ["symbol","timestamp"]:
+        if not isinstance(data.index, pd.MultiIndex) or \
+           data.index.names != ["symbol","timestamp"]:
             raise ValueError("Index must be MultiIndex ['symbol','timestamp'].")
 
-        symbols    = df.index.get_level_values("symbol").unique()
-        timestamps = sorted(df.index.get_level_values("timestamp").unique())
+        symbols    = data.index.get_level_values("symbol").unique()
+        timestamps = sorted(data.index.get_level_values("timestamp").unique())
+        # 0) Fit & predict per symbol once, gathering test timestamps & probs
+        groups = [(sym, data.xs(sym, level="symbol")) for sym in symbols]
+        fitted = Parallel(n_jobs=self.n_jobs)(
+            delayed(self._fit_symbol)(sym, df_sym) for sym, df_sym in groups
+        )
+        # 1) Build prob_panels and collect all test timestamps
+        prob_panels = {}
+        test_ts_all = set()
+        for sym, ts_list, probs in fitted:
+            prob_panels[sym] = pd.Series(probs, index=ts_list)
+            test_ts_all.update(ts_list)
 
+        # 2) At each timestamp, rank symbols by prob_up and mark top_k
+        idx_tuples = []
         all_positions = []
-
         for t in timestamps:
-            # slice history up to t
-            hist = df.loc[pd.IndexSlice[:, :t], :]
-            # build tasks for symbols that have data at t
-            tasks = []
-            for sym in symbols:
-                df_sym = hist.xs(sym, level="symbol")
-                if len(df_sym) >= self.predictor.d + 1:
-                    tasks.append((sym, df_sym))
+            # only generate non-zero signals if t is in the test period
+            if t not in test_ts_all:
+                # pre‐test: everyone flat
+                for sym in symbols:
+                    idx_tuples.append((sym, t))
+                    all_positions.append(0.0)
+            else:
+                # build cross‐section for t
+                row = {sym: prob_panels[sym].get(t, 0.0) for sym in symbols}
+                # rank
+                ranked = sorted(row.items(), key=lambda x: x[1], reverse=True)
+                top_syms = {sym for sym, _ in ranked[: self.top_k]}
 
-            # parallel probability estimates
-            results = Parallel(n_jobs=self.n_jobs)(
-                delayed(self._predict_prob)(sym, df_sym)
-                for sym, df_sym in tasks
-            )
-            probs = dict(results)
+                # record signals
+                for sym in symbols:
+                    idx_tuples.append((sym, t))
+                    all_positions.append(1.0 if sym in top_syms else 0.0)
 
-            # rank and pick top_k
-            ranked = sorted(probs.items(), key=lambda x: x[1], reverse=True)
-            top_syms = {sym for sym, _ in ranked[: self.top_k]}
-
-            # build signals at date t
-            idx = pd.MultiIndex.from_product(
-                [symbols, [t]],
-                names=["symbol","timestamp"]
-            )
-            df_t = pd.DataFrame(index=idx)
-            df_t['position'] = [1.0 if sym in top_syms else 0.0 for sym, _ in idx]
-            all_positions.append(df_t)
-        df['position'] = pd.concat(all_positions).sort_index()
-        df['signal'] = df.groupby(level='symbol')['position'].diff().fillna(0)
-        return df
+        idx = pd.MultiIndex.from_tuples(idx_tuples, names=["symbol","timestamp"])
+        out = pd.DataFrame(index=idx)
+        out["position"] = all_positions
+        data['position'] = out["position"]
+        data['signal'] = data.groupby(level='symbol')['position'].diff().fillna(0)
+        return data

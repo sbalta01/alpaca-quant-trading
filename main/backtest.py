@@ -26,11 +26,14 @@ if __name__ == "__main__":
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
-    # sp500.remove('GEV')
+    sp500.remove('CEG')
+    sp500.remove('GEHC')
+    sp500.remove('KVUE')
+    sp500.remove('VLTO')
     symbols = sp500
 
-    start   = datetime(2022, 1, 1)
-    end     = datetime(2023, 1, 24)
+    start   = datetime(2015, 1, 1)
+    end     = datetime(2025, 5, 26)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'sma')
