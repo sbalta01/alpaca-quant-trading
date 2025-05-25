@@ -80,6 +80,7 @@ def run_backtest_strategy(
     results_control = engine_control.run()
 
 
+    
     # 3) Print summary
     pnl = results["equity"].iloc[-1] - initial_cash
     ret = pnl / initial_cash * 100.0

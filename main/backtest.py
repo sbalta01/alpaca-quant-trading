@@ -16,21 +16,14 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = "USO"
     # symbols = "SPY"
-    symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    # # fetch_sp500_symbols()
-    # sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
-    # sp500.remove("GEV")
-    # sp500.remove("SOLV")
-    # symbols = sp500
-    
-    start   = datetime(2015, 1, 1)
-    end     = datetime(2025, 5, 25)
+    # symbols = ["AAPL","AMZN","MSFT","GOOG"]
+    start   = datetime(2023, 1, 1)
+    end     = datetime(2025, 5, 24)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'sma')
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
-
     # strat = RollingWindowStrategy(
     #     train_window=252,        # use ~1 year of daily bars
     #     retrain_every=5,         # retrain weekly
@@ -38,6 +31,7 @@ if __name__ == "__main__":
     #     max_depth=3,
     #     random_state=42
     # )
+<<<<<<< HEAD
     strat = AdaBoostStrategy(
         d=10, #10 has the best
         train_frac=0.7,
@@ -56,10 +50,32 @@ if __name__ == "__main__":
     #     'clf__n_estimators': [50,100],
     #     'clf__learning_rate': [0.5,1.0]
     # }
+=======
+    # strat = AdaBoostStrategy(
+    #     d=10, #10 has the best
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     param_grid={
+    #         'clf__n_estimators': [50,100,200],
+    #         'clf__learning_rate': [0.1,0.5,1.0]
+    #     }
+>>>>>>> parent of baa434c (To be reverted)
     # )
-    # strat = RankingTopKStrategy(predictor=predictor, top_k=1, n_jobs=-1)
 
+    predictor = AdaBoostStrategy(
+    d=10,
+    train_frac=0.7,
+    cv_splits=5,
+    param_grid={
+        'clf__n_estimators': [50,100],
+        'clf__learning_rate': [0.5,1.0]
+    }
+    )
+    strat = RankingTopKStrategy(predictor=predictor, top_k=10, n_jobs=-1)
 
+    # fetch_sp500_symbols()
+    sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
+    symbols = sp500
 
     results = run_backtest_strategy(
         strategy=strat,
