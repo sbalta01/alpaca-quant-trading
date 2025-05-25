@@ -2,11 +2,8 @@
 from datetime import datetime
 
 from alpaca.data.timeframe import TimeFrame
-import pandas as pd
 
-from src.data.data_loader import fetch_sp500_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
-from src.strategies.adaboost_ranking_topk_ML import RankingTopKStrategy
 from src.strategies.moving_average import MovingAverageStrategy
 from src.strategies.bollinger_mean_reversion import BollingerMeanReversionStrategy
 from src.execution.backtest_executor import run_backtest_strategy
@@ -41,7 +38,6 @@ if __name__ == "__main__":
     #     max_depth=3,
     #     random_state=42
     # )
-
     strat = AdaBoostStrategy(
         d=10, #10 has the best
         train_frac=0.7,
@@ -72,7 +68,7 @@ if __name__ == "__main__":
         end=end,
         timeframe=timeframe,
         initial_cash=10_000,
-        feed = "iex"
+        feed = "sip"
     )
 
     # Plot the equity curve
