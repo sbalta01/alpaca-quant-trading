@@ -53,6 +53,8 @@ def run_backtest_strategy(
         start_control = end - timedelta(days=delta.days*(1-train_frac))
         delta = end - start_control
 
+        print(start_control)
+
         df_control = fetch_alpaca_data(
         symbol=symbols,
         start=start_control,

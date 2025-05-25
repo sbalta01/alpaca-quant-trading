@@ -2,6 +2,7 @@
 from datetime import datetime
 
 from alpaca.data.timeframe import TimeFrame
+import pandas as pd
 
 from src.strategies.adaboost_ML import AdaBoostStrategy
 from src.strategies.moving_average import MovingAverageStrategy
@@ -15,8 +16,13 @@ from src.strategies.rolling_window_ML import RollingWindowStrategy
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = "USO"
-    # symbols = "SPY"
+    symbols = "SPY"
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
+
+    # # fetch_sp500_symbols()
+    # sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
+    # symbols = sp500
+
     start   = datetime(2023, 1, 1)
     end     = datetime(2025, 5, 24)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -31,7 +37,6 @@ if __name__ == "__main__":
     #     max_depth=3,
     #     random_state=42
     # )
-<<<<<<< HEAD
     strat = AdaBoostStrategy(
         d=10, #10 has the best
         train_frac=0.7,
@@ -42,40 +47,6 @@ if __name__ == "__main__":
         }
     )
 
-    # predictor = AdaBoostStrategy(
-    # d=10,
-    # train_frac=0.7,
-    # cv_splits=5,
-    # param_grid={
-    #     'clf__n_estimators': [50,100],
-    #     'clf__learning_rate': [0.5,1.0]
-    # }
-=======
-    # strat = AdaBoostStrategy(
-    #     d=10, #10 has the best
-    #     train_frac=0.7,
-    #     cv_splits=5,
-    #     param_grid={
-    #         'clf__n_estimators': [50,100,200],
-    #         'clf__learning_rate': [0.1,0.5,1.0]
-    #     }
->>>>>>> parent of baa434c (To be reverted)
-    # )
-
-    predictor = AdaBoostStrategy(
-    d=10,
-    train_frac=0.7,
-    cv_splits=5,
-    param_grid={
-        'clf__n_estimators': [50,100],
-        'clf__learning_rate': [0.5,1.0]
-    }
-    )
-    strat = RankingTopKStrategy(predictor=predictor, top_k=10, n_jobs=-1)
-
-    # fetch_sp500_symbols()
-    sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
-    symbols = sp500
 
     results = run_backtest_strategy(
         strategy=strat,
@@ -84,7 +55,7 @@ if __name__ == "__main__":
         end=end,
         timeframe=timeframe,
         initial_cash=10_000,
-        feed = "sip"
+        feed = "iex"
     )
 
     # Plot the equity curve
