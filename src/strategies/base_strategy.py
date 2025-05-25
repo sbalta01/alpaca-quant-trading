@@ -13,8 +13,8 @@ class Strategy(ABC):
           * 'signal'    column (1.0 = long, 0.0 = flat)
           * 'positions' column (diff of signal: +1 buy, -1 sell)
     """
-
     name: str  # e.g. "MovingAverage"
+    multi_symbol = False
 
     def __init__(self, **kwargs):
         """

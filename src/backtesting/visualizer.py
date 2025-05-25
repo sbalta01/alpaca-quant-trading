@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import pandas as pd
 
-def plot_equity(results: pd.DataFrame, title: str = "Equity Curve") -> None:
+def plot_returns(results: pd.DataFrame, title: str = "returns Curve") -> None:
     """
-    Plot the evolution of account equity over time.
+    Plot the evolution of account returns over time.
     Supports single-symbol (DatetimeIndex) or multi-symbol (MultiIndex with level 'symbol').
     
     Parameters
     ----------
     results : pd.DataFrame
-        Must contain an 'equity' column. Index is either:
+        Must contain an 'returns' column. Index is either:
           - DatetimeIndex for one symbol
           - MultiIndex ['symbol', 'timestamp'] for multiple symbols
     title : str
@@ -24,14 +24,14 @@ def plot_equity(results: pd.DataFrame, title: str = "Equity Curve") -> None:
         # multiple symbols: plot each on the same axes
         for symbol, grp in results.groupby(level="symbol"):
             grp = grp.droplevel("symbol")
-            ax.plot(grp.index, grp["equity"], label=symbol)
+            ax.plot(grp.index, grp["returns"], label=symbol)
         ax.legend()
     else:
         # single symbol: just plot
-        ax.plot(results.index, results["equity"])
+        ax.plot(results.index, results["returns"])
     
     ax.set_xlabel("Date")
-    ax.set_ylabel("Equity")
+    ax.set_ylabel("returns")
     ax.set_title(title)
     ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
     fig.autofmt_xdate()
