@@ -22,7 +22,7 @@ if __name__ == "__main__":
     # symbols = "USO"
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    # symbols = ["AAPL","AMZN"]
+    symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -30,9 +30,9 @@ if __name__ == "__main__":
     sp500.remove('GEHC')
     sp500.remove('KVUE')
     sp500.remove('VLTO')
-    symbols = sp500
+    # symbols = sp500
 
-    start   = datetime(2015, 1, 1)
+    start   = datetime(2023, 1, 1)
     end     = datetime(2025, 5, 26)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
@@ -47,30 +47,30 @@ if __name__ == "__main__":
     #     random_state=42
     # )
 
-    # strat = AdaBoostStrategy(
-    #     d=10, #10 has the best
-    #     train_frac=0.7,
-    #     cv_splits=5,
-    #     param_grid={
-    #         'clf__n_estimators': [50,100,200],
-    #         'clf__learning_rate': [0.1,0.5,1.0]
-    #     }
-    # )
-
-    predictor = AdaBoostStrategy(
-        d=10,
+    strat = AdaBoostStrategy(
+        d=10, #10 has the best
         train_frac=0.7,
         cv_splits=5,
         param_grid={
-            'clf__n_estimators': [50, 100],
-            'clf__learning_rate': [0.5, 1.0]
+            'clf__n_estimators': [50,100,200],
+            'clf__learning_rate': [0.1,0.5,1.0]
         }
     )
-    strat = MomentumRankingAdaBoostStrategy(
-        predictor=predictor,
-        top_k=10,
-        n_jobs=-1
-    )
+
+    # predictor = AdaBoostStrategy(
+    #     d=10,
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     param_grid={
+    #         'clf__n_estimators': [50, 100],
+    #         'clf__learning_rate': [0.5, 1.0]
+    #     }
+    # )
+    # strat = MomentumRankingAdaBoostStrategy(
+    #     predictor=predictor,
+    #     top_k=1,
+    #     n_jobs=-1
+    # )
 
     
 

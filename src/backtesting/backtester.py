@@ -34,8 +34,6 @@ class BacktestEngine:
         """
         Run backtest for ONE symbol (DatetimeIndex).
         """
-        df = self.strategy.generate_signals(df).copy()
-
         # Initialize
         df["position"] = float(0.0)   # share count
         df["cash"]     = float(self.initial_cash_per_stock)
@@ -70,57 +68,29 @@ class BacktestEngine:
         df = self.data
 
         if self.strategy.multi_symbol:
-            df = self.strategy.generate_signals(df).copy()
-            
-            # Initialize
-            
+            df = self.strategy.generate_signals(df).copy() ##Generate signals all at once
             results = []
             for symbol, subdf in df.groupby(level="symbol"):
-                cash = float(self.initial_cash_per_stock)
-                position = float(0.0)
-                single = subdf.droplevel("symbol")
-                single["position"] = float(0.0)   # share count
-                single["cash"]     = float(self.initial_cash_per_stock)
-                single["returns"]   = float(0.0)
-                for t in range(1, len(single)):
-                    price  = single["close"].iat[t]
-                    signal = single["signal"].iat[t]  # +1 buy, -1 sell, 0 hold
-
-                    if signal ==  1.0 and position == 0.0:
-                        # Buy all‐in
-                        position = cash / price
-                        cash = 0.0
-                    elif signal == -1.0 and position > 0.0:
-                        # Sell all‐out
-                        cash = position * price
-                        position = 0.0
-
-                    single.iat[t, single.columns.get_loc("position")] = position
-                    single.iat[t, single.columns.get_loc("cash")]     = cash
-                    single.iat[t, single.columns.get_loc("returns")]   = (cash + position * price - self.initial_cash_per_stock)/self.initial_cash_per_stock
-
-                single["symbol"] = symbol
-                results.append(single)
-            # concat and re‐set MultiIndex(symbol, timestamp)
-            final = pd.concat(results)
-            final = final.set_index("symbol", append=True)
-            final = final.reorder_levels(["symbol", final.index.names[0]])
-            return final.sort_index()
-        else:
-            # Expect levels: ['symbol','timestamp']
-            results = []
-            for symbol, subdf in df.groupby(level="symbol"):
-                # drop the symbol level for single‐symbol run
                 single = subdf.droplevel("symbol")
                 out = self._run_single(single)
-                # reattach symbol level
+                # Reattach symbol level
                 out["symbol"] = symbol
                 results.append(out)
-            # concat and re‐set MultiIndex(symbol, timestamp)
-            final = pd.concat(results)
-            final = final.set_index("symbol", append=True)
-            final = final.reorder_levels(["symbol", final.index.names[0]])
-            return final.sort_index()
+        else:
+            results = []
+            for symbol, subdf in df.groupby(level="symbol"):
+                single = subdf.droplevel("symbol")
+                single = self.strategy.generate_signals(single).copy() ##Generate signals one by one
+                out = self._run_single(single)
+                # Reattach symbol level
+                out["symbol"] = symbol
+                results.append(out)
+
+        # concat and re‐set MultiIndex(symbol, timestamp)
+        final = pd.concat(results)
+        final = final.set_index("symbol", append=True)
+        final = final.reorder_levels(["symbol", final.index.names[0]])
+        return final.sort_index()
 
     def performance(self, results: pd.DataFrame) -> Dict[str, float]:
         """
