@@ -23,4 +23,4 @@ jobs:
       #   run: pip install -r requirements.txt
 
       - name: Deploy strategy
-        run: python main\deploy.py
+        run: python main/deploy.py
