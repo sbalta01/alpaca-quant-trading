@@ -1,4 +1,4 @@
-name: Trading Trigger
+name: Trading Deploy
 run-name: ${{ github.actor }} is deploying a quant trading algorithm. 
 
 on: workflow_dispatch
