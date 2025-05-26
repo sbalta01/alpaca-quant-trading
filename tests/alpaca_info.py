@@ -1,4 +1,3 @@
-import os
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
@@ -8,18 +7,14 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 from datetime import datetime, timedelta
 import pandas as pd
 
-# ── CONFIG ─────────────────────────────────────────────────────────
 from dotenv import load_dotenv
-from pathlib import Path
-
-load_dotenv(dotenv_path=Path('.') / '.env')
-
-
-API_KEY    = os.getenv("APCA_API_KEY_ID")
-API_SECRET = os.getenv("APCA_API_SECRET_KEY")
+import os
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
+API_SECRET = os.getenv("API_SECRET")
+PAPER = os.getenv("PAPER")
 BASE_URL   = "https://paper-api.alpaca.markets"
 
-PAPER = True  # Set to False for live trading
 
 # Clients
 trading_client = TradingClient(API_KEY, API_SECRET, paper=PAPER)
