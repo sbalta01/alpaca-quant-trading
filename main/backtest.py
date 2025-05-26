@@ -19,10 +19,10 @@ import time
 
 if __name__ == "__main__":
     # symbols = ["AAPL"]
-    # symbols = "USO"
-    # symbols = ["SPY"]
+    # symbols = ["USO"]
+    symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    symbols = ["AAPL","AMZN"]
+    # symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -32,8 +32,8 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2023, 1, 1)
-    end     = datetime(2025, 5, 26)
+    start   = datetime(2024, 1, 1)
+    end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'sma')
@@ -71,8 +71,6 @@ if __name__ == "__main__":
     #     top_k=1,
     #     n_jobs=-1
     # )
-
-    
 
     start_backtest = time.perf_counter()
 
