@@ -19,8 +19,8 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.13
-      - name: Install requirements
-        run: pip install -r requirements.txt
+      # - name: Install requirements
+      #   run: pip install -r requirements.txt
 
       - name: Deploy strategy
         run: python main\deploy.py
