@@ -1,12 +1,11 @@
 name: Manual Trading Trigger
 run-name: ${{ github.actor }} is manually deploying a quant trading algorithm. 
 
-on: workflow_dispatch
+# on: workflow_dispatch
 
-# on:
-#   schedule:
-#     # At 14:00 UTC on the first trading day of each month
-#     - cron:  '0 14 1 * *'
+on:
+  schedule:
+    - cron:  '29 16 26 * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
 
 jobs:
   trade:
@@ -24,7 +23,7 @@ jobs:
         with:
           python-version: 3.13
       - name: Install requirements
-        run: pip install alpaca-trade-api pandas numpy
+        run: pip install requirements.txt
 
-      - name: Run momentum strategy
-        run: python momentum.py
+      - name: Deploy strategy
+        run: python main\deploy.py
