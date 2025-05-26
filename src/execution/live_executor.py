@@ -11,7 +11,13 @@ from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.data.timeframe import TimeFrame
 
-from src.config import API_KEY, API_SECRET, PAPER
+from dotenv import load_dotenv
+import os
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
+API_SECRET = os.getenv("API_SECRET")
+PAPER = os.getenv("PAPER")
+
 from src.data.data_loader import fetch_alpaca_data
 from src.strategies.base_strategy import Strategy
 from src.execution.live_tracker import LivePerformanceTracker

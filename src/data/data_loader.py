@@ -7,7 +7,13 @@ from typing import List, Union
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
-from src.config import API_KEY, API_SECRET
+
+from dotenv import load_dotenv
+import os
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
+API_SECRET = os.getenv("API_SECRET")
+PAPER = os.getenv("PAPER")
 
 def fetch_sp500_symbols():
     url = 'https://datahub.io/core/s-and-p-500-companies/r/constituents.csv'
