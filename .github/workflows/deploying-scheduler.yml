@@ -1,11 +1,11 @@
-name: Manual Trading Trigger
-run-name: ${{ github.actor }} is manually deploying a quant trading algorithm. 
+name: Trading Trigger
+run-name: ${{ github.actor }} is deploying a quant trading algorithm. 
 
-# on: workflow_dispatch
+on: workflow_dispatch
 
-on:
-  schedule:
-    - cron:  '36 16 * * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+# on:
+#   schedule:
+#     - cron:  '36 16 * * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
 
 jobs:
   trade:
@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: 3.13
       - name: Install requirements
-        run: pip install requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Deploy strategy
         run: python main\deploy.py
