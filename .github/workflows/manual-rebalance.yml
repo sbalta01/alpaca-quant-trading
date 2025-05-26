@@ -5,14 +5,11 @@ run-name: ${{ github.actor }} is manually deploying a quant trading algorithm.
 
 on:
   schedule:
-    - cron:  '31 18 26 * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+    - cron:  '36 16 * * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
 
 jobs:
   trade:
     runs-on: ubuntu-latest
-    env:
-      APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
-      APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
 
     steps:
       - name: Checkout repo
