@@ -1,5 +1,6 @@
 # src/strategies/moving_average.py
 
+import numpy as np
 from src.strategies.base_strategy import Strategy
 from src.utils.indicators import sma, ema, rsi
 import pandas as pd
@@ -13,11 +14,13 @@ class MovingAverageStrategy(Strategy):
     """
     name = "MovingAverage"
 
-    def __init__(self, short_window: int = 5, long_window: int = 20, ma: str = 'sma'):
+    def __init__(self, short_window: int = 5, long_window: int = 20, 
+        angle_threshold_deg: float = 0.0, ma: str = 'sma'):
         if short_window >= long_window:
             raise ValueError("short_window must be < long_window")
         self.short_window = short_window
         self.long_window = long_window
+        self.angle_threshold_rad = np.radians(angle_threshold_deg)
         self.ma = ma
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -43,9 +46,16 @@ class MovingAverageStrategy(Strategy):
             
 
         # Generate raw positions
-        df['position'] = 0.0
-        df.loc[df['ma_short'] > df['ma_long'], 'position'] = 1.0
-        # df.loc[df['close'] > df['ma_short'], 'position'] = 1.0
+        df['position'] = (df['ma_short'] > df['ma_long']).astype(float)
+
+        # df['position'] = (df['close'] > df['ma_short']).astype(float)
+        df['ma_diff'] = df['ma_short'] - df['ma_long']
+        df['angle'] = np.arctan(df['ma_diff'])
+
+        df['position'] = (
+            (df['ma_short'] > df['ma_long']) &
+            (df['angle'].abs() > self.angle_threshold_rad)
+        ).astype(float)
 
         # Generate trading orders: +1 for a buy, -1 for a sell
         df['signal'] = df['position'].diff().fillna(0)

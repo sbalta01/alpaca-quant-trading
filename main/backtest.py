@@ -33,12 +33,12 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2023, 5, 10)
-    # end     = datetime(2025, 5, 27)
-    end     = datetime(2025, 1, 1)
+    start   = datetime(2022, 5, 10)
+    end     = datetime(2025, 5, 27)
+    # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    strat = MovingAverageStrategy(short_window=9, long_window=20, ma = 'ema')
+    strat = MovingAverageStrategy(short_window=9, long_window=20, angle_threshold_deg = 45.0, ma = 'ema')
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
     # strat = RollingWindowStrategy(
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # )
 
     # strat = AdaBoostStrategy(
-    #     d=5, #10 has the best
+    #     d=10, #10 has the best
     #     train_frac=0.7,
     #     cv_splits=5,
     #     param_grid={
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # )
 
     # predictor = AdaBoostStrategy(
-    #     d=10,
+    #     d=5,
     #     train_frac=0.7,
     #     cv_splits=5,
     #     param_grid={
