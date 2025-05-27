@@ -1,11 +1,11 @@
 name: Trading Deploy
 run-name: ${{ github.actor }} is deploying a quant trading algorithm. 
 
-on: workflow_dispatch
+# on: workflow_dispatch
 
-# on:
-#   schedule:
-#     - cron:  '26 23 * * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+on:
+  schedule:
+    - cron:  '00 14 * * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
 
 jobs:
   trade:
@@ -38,4 +38,4 @@ jobs:
         env:
             PYTHONPATH: ${{ github.workspace }}
         
-        run: python main/deploy.py
+        run: python main/deploy_AdaBoost.py

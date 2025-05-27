@@ -57,8 +57,6 @@ def run_live_strategy(
     interval_seconds : int
     feed : str
     """
-    if isinstance(symbols, str):
-        symbols = [symbols]
 
     def trade(sig, symbol):
         open_pos = trading_client.get_all_positions()
@@ -94,8 +92,8 @@ def run_live_strategy(
 
         else:
             print(f"[{symbol}] No trade signal (signal={sig}, holding={holding}, qty={qty}).")
-
-    while True:
+    running = True
+    while running:
         now_utc = datetime.now(timezone.utc)
         start = now_utc - timedelta(minutes=lookback_minutes)
         print(f"\n[{now_utc.strftime('%Y-%m-%d %H:%M:%S')}] Fetching bars for {symbols}")
@@ -129,5 +127,7 @@ def run_live_strategy(
         tracker.update_equity(open_positions)
         tracker.print_status()
 
-
-        time.sleep(interval_seconds)
+        if interval_seconds is None:
+            running = False
+        else:
+            time.sleep(interval_seconds)
