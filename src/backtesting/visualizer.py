@@ -65,7 +65,12 @@ def plot_signals(
     fig, ax = plt.subplots()
     
     def _plot_for_group(df: pd.DataFrame, label: str = None):
-        ax.plot(df.index, df[price_col], label=label or "Price")
+        ax.plot(df.index, df[price_col], label=label or "Price", color = 'k')
+        try:
+            ax.plot(df.index, df["ma_short"], '--', label="Short MA")
+            ax.plot(df.index, df["ma_long"], '--', label="Long MA")
+        except:
+            pass
         buys  = df[df[signal_col] ==  1.0]
         sells = df[df[signal_col] == -1.0]
         ax.scatter(buys.index,  buys[price_col], marker="^", color = "olive", label=f"{label} Buy" if label else "Buy",  s=50)
