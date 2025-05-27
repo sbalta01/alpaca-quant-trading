@@ -104,4 +104,4 @@ def run_backtest_strategy(
     print(f"Return (%)   : {ret*100:,.2f}%")
     print(f"Return Control (%)   : {ret_control*100:,.2f}%\n")
     
-    return results
+    return results, results_control

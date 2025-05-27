@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 
 from alpaca.data.timeframe import TimeFrame
+from matplotlib import pyplot as plt
 import pandas as pd
 
 from src.data.data_loader import fetch_sp500_symbols
@@ -20,9 +21,9 @@ import time
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    symbols = ["SPY"]
+    # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    # symbols = ["AAPL","AMZN"]
+    symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     end     = datetime(2025, 5, 27)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    strat = MovingAverageStrategy(short_window=9, long_window=20, ma = 'sma')
+    strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'sma')
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
     # strat = RollingWindowStrategy(
@@ -74,7 +75,7 @@ if __name__ == "__main__":
 
     start_backtest = time.perf_counter()
 
-    results = run_backtest_strategy(
+    results, results_control = run_backtest_strategy(
         strategy=strat,
         symbols=symbols,
         start=start,
@@ -90,7 +91,7 @@ if __name__ == "__main__":
     print(f"Elapsed time: {formatted}")
 
     # Plot the equity curve
-    plot_returns(results, title=f"{strat.name} Equity Curve")
+    plot_returns(results, results_control, title=f"{strat.name} Equity Curve")
     # Price with buy/sell markers for each symbol
     plot_signals(
         results,
