@@ -45,6 +45,7 @@ class MovingAverageStrategy(Strategy):
         # Generate raw positions
         df['position'] = 0.0
         df.loc[df['ma_short'] > df['ma_long'], 'position'] = 1.0
+        # df.loc[df['close'] > df['ma_short'], 'position'] = 1.0
 
         # Generate trading orders: +1 for a buy, -1 for a sell
         df['signal'] = df['position'].diff().fillna(0)

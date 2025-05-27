@@ -21,9 +21,9 @@ import time
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    # symbols = ["SPY"]
+    symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    symbols = ["AAPL","AMZN"]
+    # symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -34,10 +34,11 @@ if __name__ == "__main__":
     # symbols = sp500
 
     start   = datetime(2023, 5, 10)
-    end     = datetime(2025, 5, 27)
+    # end     = datetime(2025, 5, 27)
+    end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    strat = MovingAverageStrategy(short_window=5, long_window=20, ma = 'sma')
+    strat = MovingAverageStrategy(short_window=9, long_window=20, ma = 'ema')
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
     # strat = RollingWindowStrategy(
@@ -49,7 +50,7 @@ if __name__ == "__main__":
     # )
 
     # strat = AdaBoostStrategy(
-    #     d=10, #10 has the best
+    #     d=5, #10 has the best
     #     train_frac=0.7,
     #     cv_splits=5,
     #     param_grid={
