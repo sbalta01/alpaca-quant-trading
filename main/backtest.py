@@ -2,7 +2,6 @@
 from datetime import datetime, timedelta
 
 from alpaca.data.timeframe import TimeFrame
-from matplotlib import pyplot as plt
 import pandas as pd
 
 from src.data.data_loader import fetch_sp500_symbols
@@ -20,9 +19,9 @@ import time
 
 if __name__ == "__main__":
     # symbols = ["AAPL"]
-    # symbols = ["USO"]
+    symbols = ["USO"]
     # symbols = ["SPY"]
-    symbols = ["AAPL","AMZN","MSFT","GOOG"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG"]
     # symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2023, 1, 1)
+    start   = datetime(2021, 1, 1)
     # end     = datetime(2025, 5, 28)
     end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -53,11 +52,12 @@ if __name__ == "__main__":
         d=10, #10 has the best
         train_frac=0.7,
         cv_splits=5,
-        param_grid={
-            'clf__n_estimators': [50,100,200],
-            'clf__learning_rate': [0.1,0.5,1.0]
-        },
-        ratio_outliers = 1.5
+        # param_grid={
+        #     'clf__n_estimators': [50,100,200],
+        #     'clf__learning_rate': [0.1,0.5,1.0]
+        # },
+        # ratio_outliers = 1.75,
+        n_iter_search = 50
     )
 
     # predictor = AdaBoostStrategy(
@@ -92,13 +92,13 @@ if __name__ == "__main__":
     formatted = str(timedelta(seconds=elapsed_seconds))
     print(f"Elapsed time: {formatted}")
 
-    # # Plot the equity curve
-    # plot_returns(results, results_control, title=f"{strat.name} Equity Curve")
-    # # Price with buy/sell markers for each symbol
-    # plot_signals(
-    #     results,
-    #     results_control,
-    #     price_col='close',
-    #     signal_col='signal',
-    #     title=f"{strat.name} Signals on Price"
-    # )
+    # Plot the equity curve
+    plot_returns(results, results_control, title=f"{strat.name} Equity Curve")
+    # Price with buy/sell markers for each symbol
+    plot_signals(
+        results,
+        results_control,
+        price_col='close',
+        signal_col='signal',
+        title=f"{strat.name} Signals on Price"
+    )

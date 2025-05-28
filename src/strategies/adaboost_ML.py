@@ -1,12 +1,12 @@
 # src/strategies/adaboost_ML.py
 
+from scipy.stats import randint, uniform
 import pandas as pd
 import numpy as np
 from typing import Dict, Any
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.linear_model import Ridge
-from sklearn.feature_selection import RFE
-from sklearn.model_selection import GridSearchCV, TimeSeriesSplit, KFold, train_test_split
+from sklearn.feature_selection import RFECV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, TimeSeriesSplit, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
@@ -29,7 +29,8 @@ class AdaBoostStrategy(Strategy):
         cv_splits: int = 5,
         param_grid: Dict[str, Any] = None,
         random_state: int = 42,
-        ratio_outliers:float = np.inf
+        ratio_outliers:float = np.inf,
+        n_iter_search: int = 50
     ):
         """
         Parameters
@@ -50,16 +51,24 @@ class AdaBoostStrategy(Strategy):
         self.train_frac = train_frac
         self.cv_splits = cv_splits
         self.param_grid = param_grid or {
-            'clf__n_estimators': [50, 100],
-            'clf__learning_rate': [0.5, 1.0]
+            'clf__n_estimators': randint(50, 500),
+            'clf__learning_rate': uniform(0.01, 2.0)
         }
         self.random_state = random_state
         self.ratio_outliers = ratio_outliers
+        self.n_iter_search = n_iter_search
 
-        # Pipeline: scaler → RFE(Ridge) → AdaBoost
+        #Pipeline: scale → RFECV(AdaBoost) (with inner CV) → final estimator
+        inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            ('rfe', RFE(Ridge(random_state=self.random_state), n_features_to_select=26)),
+            ('rfecv', RFECV(
+                estimator=AdaBoostClassifier(random_state=self.random_state),
+                step=0.1,            # remove 10% features each iteration
+                cv=inner_cv,
+                scoring='accuracy',
+                n_jobs=-1
+            )),
             ('clf', AdaBoostClassifier(random_state=self.random_state))
         ])
 
@@ -151,15 +160,33 @@ class AdaBoostStrategy(Strategy):
             X, y, train_size=self.train_frac, shuffle=False
         )
 
-        # 4) Nested CV Grid Search on train+val
-        tscv = TimeSeriesSplit(n_splits=self.cv_splits)
-        gs = GridSearchCV(
-            self.pipeline,
-            param_grid=self.param_grid,
-            cv=tscv,
-            scoring='accuracy',
-            n_jobs=-1
-        )
+        # 4) Nested CV Grid Search/Randomized Search CV
+        outer_cv = TimeSeriesSplit(n_splits=self.cv_splits)
+        if isinstance(self.param_grid, dict) and all(
+            hasattr(v, "rvs") for v in self.param_grid.values()
+        ):
+            # The user did NOT supply a fixed grid then use RandomizedSearchCV
+            gs = RandomizedSearchCV(
+                estimator=self.pipeline,
+                param_distributions=self.param_grid,
+                n_iter=self.n_iter_search,
+                cv=outer_cv,
+                scoring='accuracy',
+                random_state=self.random_state,
+                n_jobs=-1
+            )
+            print('Random Search CV')
+        else:
+            # User supplied a fixed param_grid then exhaustive GridSearch
+            gs = GridSearchCV(
+                estimator=self.pipeline,
+                param_grid=self.param_grid,
+                cv=outer_cv,
+                scoring='accuracy',
+                n_jobs=-1
+            )
+            print('Grid Search CV')
+
         gs.fit(X_train, y_train)
         best = gs.best_estimator_
 
