@@ -30,7 +30,7 @@ class AdaBoostStrategy(Strategy):
         cv_splits: int = 5,
         param_grid: Dict[str, Any] = None,
         random_state: int = 42,
-        ratio_outliers:float = 1.5
+        ratio_outliers:float = np.inf
     ):
         """
         Parameters
@@ -137,9 +137,7 @@ class AdaBoostStrategy(Strategy):
         # 1) Build features & target
         feat = self._compute_features(df)
         # target = sign of ΔMA(d)
-        feat['target'] = np.sign(
-            feat[f'MA{self.d}'].shift(-1) - feat[f'MA{self.d}']
-        )
+        feat['target'] = (feat[f'MA{self.d}'].shift(-1) > feat[f'MA{self.d}']).astype(int)
         feat = feat.dropna()
         feat['target'] = feat['target'].astype(int)
 
@@ -172,20 +170,17 @@ class AdaBoostStrategy(Strategy):
         print("Confusion matrix:\n", cm)
 
         # 6) Generate signals: only in test period
-        signals = pd.Series(0.0, index=feat.index)
+        positions = pd.Series(0.0, index=feat.index)
+        y_test_series = pd.Series(0.0, index=feat.index)
         idxs = list(X_test.index)
-        prev_pos = 0
-        for idx, pred in zip(idxs, y_pred):
-            if pred == 1 and prev_pos == 0:
-                signals.at[idx] = 1.0
-                prev_pos = 1
-            elif pred == -1 and prev_pos == 1:
-                signals.at[idx] = -1.0
-                prev_pos = 0
-            else:
-                signals.at[idx] = 0.0
-
-        # 7) Merge back to full
+        for idx, pred, y in zip(idxs, y_pred, y_test):
+            positions.at[idx] = pred
+            y_test_series.at[idx] = y
+        
         out = df.copy()
-        out['signal'] = signals.reindex(df.index).fillna(0.0)
+        out["position"] = positions.reindex(df.index).fillna(0.0)
+        out['signal'] = out['position'].diff().fillna(0.0)
+        
+        out["y_test"] = y_test_series.reindex(df.index).fillna(0.0)
+        out["y_pred"] = out["position"].copy()
         return out

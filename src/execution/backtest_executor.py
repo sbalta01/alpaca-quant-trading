@@ -88,7 +88,7 @@ def run_backtest_strategy(
     print(f"Period       : {start.date()} → {end.date()}")
     print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
     print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
-    print(f"Profit       : {perf['Profit']:.2f}%  |  Benchmark: {perf_ctrl['Profit']:.2f}%")
+    print(f"Profit       : {perf['Profit']:.2f}  |  Benchmark: {perf_ctrl['Profit']:.2f}")
     print(f"Max Drawdown       : {perf['Max Drawdown']*100:.2f}%  |  Benchmark: {perf_ctrl['Max Drawdown']*100:.2f}%")
     print(f"CAGR       : {perf['CAGR']*100:.2f}%  |  Benchmark: {perf_ctrl['CAGR']*100:.2f}%")
     print(f"Final Return       : {perf['Final Return']*100:.2f}%  |  Benchmark: {perf_ctrl['Final Return']*100:.2f}%\n")

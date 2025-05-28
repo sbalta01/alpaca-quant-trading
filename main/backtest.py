@@ -33,7 +33,7 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2023, 5, 10)
+    start   = datetime(2015, 5, 10)
     end     = datetime(2025, 5, 28)
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -56,7 +56,8 @@ if __name__ == "__main__":
         param_grid={
             'clf__n_estimators': [50,100,200],
             'clf__learning_rate': [0.1,0.5,1.0]
-        }
+        },
+        # ratio_outliers = 1.5
     )
 
     # predictor = AdaBoostStrategy(
