@@ -3,6 +3,8 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Union
+
+from sklearn.metrics import confusion_matrix
 from src.strategies.base_strategy import Strategy
 
 class BacktestEngine:
@@ -94,7 +96,7 @@ class BacktestEngine:
 
     def performance(self, results: pd.DataFrame, num_years) -> Dict[str, float]:
         """Return expanded metrics: Sharpe, Sortino, Calmar, Turnover, Fitness."""
-        results["equity"] = (results["position"]*results["close"] + results["cash"])
+        results["equity"] = results["position"]*results["close"] + results["cash"]
         initial_cash = results["cash"].groupby(level="timestamp").sum().iloc[0]
         total_equity = results["equity"].groupby(level="timestamp").sum()
         final_equity = total_equity.iloc[-1]
@@ -103,7 +105,7 @@ class BacktestEngine:
         profit = final_equity - initial_cash
         total_returns_cum = total_equity.pct_change().dropna()
 
-        def metrics(total_returns_cum, total_equity):
+        def metrics(total_returns_cum, total_equity): #All metrics are calculated in a Day TimeFrame
             # Annualization factor
             ann = np.sqrt(252)
             mean = np.mean(total_returns_cum); std = np.std(total_returns_cum, ddof=1)
@@ -133,11 +135,35 @@ class BacktestEngine:
             # Fitness = sharpe / turnover
             fitness = sharpe / to if to>0 else np.nan
 
-            return initial_cash, final_equity, profit, max_drawdown, cagr, final_returns, sharpe, sortino, calmar, to, fitness
+            try:
+                total_cm = np.array([[0, 0], [0, 0]])
+                for symbol, subdf in results.groupby(level="symbol"):
+                    y_test = subdf.loc[subdf['test_mask']==1, 'y_test']
+                    y_pred = subdf.loc[subdf['test_mask']==1, 'y_pred']
+                    cm = confusion_matrix(y_test, y_pred)
+                    total_cm += cm
+
+                TN, FP, FN, TP = total_cm[0, 0], total_cm[0, 1], total_cm[1, 0], total_cm[1, 1]
+                # Accuracy
+                accuracy = (TP + TN) / (TP + TN + FP + FN)
+                # Precision and Recall
+                precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+                recall    = TP / (TP + FN) if (TP + FN) > 0 else 0
+                # F1 Score
+                f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+                ML_metrics = dict(zip(
+                    ['F1 Score', 'Accuracy', 'Precision', 'Recall'],
+                    [[f1_score,'>0.6 good, >0.8 strong. Balance precision-recall'], [accuracy,'>0.7 good. Proportion of correct predictions (Generally biased in trading)'],
+                        [precision,'>0.6 good. Ratio of correct buy predictions of all predictions'], [recall,'>0.6 good. Ratio of buy predicted of all buys']
+                        ]))
+            except:
+                ML_metrics = {'No ML algorithm': ['','']}
+
+            return initial_cash, final_equity, profit, max_drawdown, cagr, final_returns, sharpe, sortino, calmar, to, fitness, ML_metrics
 
         agg = metrics(total_returns_cum,total_equity)
         out = dict(zip(
-            ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness'],
+            ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness', 'ML metrics'],
             agg
         ))
         return out

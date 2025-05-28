@@ -9,7 +9,6 @@ from sklearn.feature_selection import RFE
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit, KFold, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import confusion_matrix, r2_score
 
 from src.strategies.base_strategy import Strategy
 from src.utils.indicators import sma, ema, rsi
@@ -166,16 +165,16 @@ class AdaBoostStrategy(Strategy):
 
         # 5) Evaluate on test
         y_pred = best.predict(X_test)
-        cm = confusion_matrix(y_test, y_pred)
-        print("Confusion matrix:\n", cm)
 
         # 6) Generate signals: only in test period
         positions = pd.Series(0.0, index=feat.index)
         y_test_series = pd.Series(0.0, index=feat.index)
+        test_mask = pd.Series(0.0, index=feat.index)
         idxs = list(X_test.index)
         for idx, pred, y in zip(idxs, y_pred, y_test):
             positions.at[idx] = pred
             y_test_series.at[idx] = y
+            test_mask.at[idx] = 1.0
         
         out = df.copy()
         out["position"] = positions.reindex(df.index).fillna(0.0)
@@ -183,4 +182,5 @@ class AdaBoostStrategy(Strategy):
         
         out["y_test"] = y_test_series.reindex(df.index).fillna(0.0)
         out["y_pred"] = out["position"].copy()
+        out["test_mask"] = test_mask.reindex(df.index).fillna(0.0)
         return out

@@ -92,13 +92,13 @@ if __name__ == "__main__":
     formatted = str(timedelta(seconds=elapsed_seconds))
     print(f"Elapsed time: {formatted}")
 
-    # Plot the equity curve
-    plot_returns(results, results_control, title=f"{strat.name} Equity Curve")
-    # Price with buy/sell markers for each symbol
-    plot_signals(
-        results,
-        results_control,
-        price_col='close',
-        signal_col='signal',
-        title=f"{strat.name} Signals on Price"
-    )
+    # # Plot the equity curve
+    # plot_returns(results, results_control, title=f"{strat.name} Equity Curve")
+    # # Price with buy/sell markers for each symbol
+    # plot_signals(
+    #     results,
+    #     results_control,
+    #     price_col='close',
+    #     signal_col='signal',
+    #     title=f"{strat.name} Signals on Price"
+    # )

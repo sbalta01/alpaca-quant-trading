@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from typing import Union, List
 
+import numpy as np
 import pandas as pd
 
 from src.data.data_loader import fetch_alpaca_data
@@ -89,12 +90,16 @@ def run_backtest_strategy(
     print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
     print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
     print(f"Profit       : {perf['Profit']:.2f}  |  Benchmark: {perf_ctrl['Profit']:.2f}")
-    print(f"Max Drawdown       : {perf['Max Drawdown']*100:.2f}%  |  Benchmark: {perf_ctrl['Max Drawdown']*100:.2f}%")
-    print(f"CAGR       : {perf['CAGR']*100:.2f}%  |  Benchmark: {perf_ctrl['CAGR']*100:.2f}%")
     print(f"Final Return       : {perf['Final Return']*100:.2f}%  |  Benchmark: {perf_ctrl['Final Return']*100:.2f}%\n")
-    print(f"Sharpe       : {perf['Sharpe']:.2f}  |  Benchmark: {perf_ctrl['Sharpe']:.2f}")
-    print(f"Sortino      : {perf['Sortino']:.2f}  |  Benchmark: {perf_ctrl['Sortino']:.2f}")
-    print(f"Calmar       : {perf['Calmar']:.2f}  |  Benchmark: {perf_ctrl['Calmar']:.2f}")
-    print(f"Turnover     : {perf['Turnover']:.4f} |  Benchmark: {perf_ctrl['Turnover']:.4f}")
-    print(f"Fitness      : {perf['Fitness']:.2f} |  Benchmark: {perf_ctrl['Fitness']:.2f}")    
+    print(f"Max Drawdown       : {perf['Max Drawdown']*100:.2f}%  |  Benchmark: {perf_ctrl['Max Drawdown']*100:.2f}%  |  <-20% risky. Less negative better")
+    print(f"CAGR       : {perf['CAGR']*100:.2f}%  |  Benchmark: {perf_ctrl['CAGR']*100:.2f}%  |  >5-10% good. Annualized return, more better")
+    print(f"Sharpe       : {perf['Sharpe']:.2f}  |  Benchmark: {perf_ctrl['Sharpe']:.2f}  |  >1 okay, >2 good. Risk adjusted return (Penalizes volatility)")
+    print(f"Sortino      : {perf['Sortino']:.2f}  |  Benchmark: {perf_ctrl['Sortino']:.2f}  |  >1.5 good. Focuses only on downside volatility")
+    print(f"Calmar       : {perf['Calmar']:.2f}  |  Benchmark: {perf_ctrl['Calmar']:.2f}  |  >1 good. Higher is more reward for risk")
+    print(f"Turnover     : {perf['Turnover']:.4f} |  Benchmark: {perf_ctrl['Turnover']:.4f}  |  0.1-0.5 okay/good, >1 bad. Higher is worse (unless transaction-free)")
+    print(f"Fitness      : {perf['Fitness']:.2f} |  Benchmark: {perf_ctrl['Fitness']:.2f}  |  >1 strong. Good for comparing strategies (How good is my strategy per trade)\n")
+
+    print("ML metrics")
+    for key, value in perf['ML metrics'].items():
+        print(key + "    : ", f"{value[0]:.2f}  |  ", value[1])
     return results, results_control
