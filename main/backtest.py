@@ -19,8 +19,8 @@ import time
 
 if __name__ == "__main__":
     # symbols = ["AAPL"]
-    symbols = ["USO"]
-    # symbols = ["SPY"]
+    # symbols = ["USO"]
+    symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
     # symbols = ["AAPL","AMZN"]
 
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2021, 1, 1)
+    start   = datetime(2015, 1, 1)
     # end     = datetime(2025, 5, 28)
     end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
