@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # symbols = sp500
 
     start   = datetime(2022, 5, 10)
-    end     = datetime(2025, 5, 27)
+    end     = datetime(2025, 5, 28)
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
@@ -96,6 +96,7 @@ if __name__ == "__main__":
     # Price with buy/sell markers for each symbol
     plot_signals(
         results,
+        results_control,
         price_col='close',
         signal_col='signal',
         title=f"{strat.name} Signals on Price"

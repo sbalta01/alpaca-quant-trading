@@ -31,6 +31,7 @@ def plot_returns(results: pd.DataFrame, results_control: pd.DataFrame, title: st
     ax.set_xlabel("Date")
     ax.set_ylabel("returns")
     ax.set_title(title)
+    ax.set_xlim(results_control.index.get_level_values('timestamp')[0], results_control.index.get_level_values('timestamp')[-1])
     ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
     fig.autofmt_xdate()
     plt.tight_layout()
@@ -39,6 +40,7 @@ def plot_returns(results: pd.DataFrame, results_control: pd.DataFrame, title: st
 
 def plot_signals(
     results: pd.DataFrame,
+    results_control: pd.DataFrame,
     price_col: str = "close",
     signal_col: str = "signal",
     title: str = "Price & Signals"
@@ -82,6 +84,7 @@ def plot_signals(
     ax.set_xlabel("Date")
     ax.set_ylabel("Price")
     ax.set_title(title)
+    ax.set_xlim(results_control.index.get_level_values('timestamp')[0], results_control.index.get_level_values('timestamp')[-1])
     ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
     fig.autofmt_xdate()
     plt.tight_layout()
