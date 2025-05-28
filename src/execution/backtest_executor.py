@@ -40,7 +40,7 @@ def run_backtest_strategy(
     # 1) Fetch historical data
     delta = end - start
     try:
-        train_val_frac = strategy.train_val_frac
+        train_frac = strategy.train_frac
 
         df = fetch_alpaca_data(
         symbol=symbols,
@@ -50,7 +50,7 @@ def run_backtest_strategy(
         feed = feed
         )
 
-        start_control = end - timedelta(days=delta.days*(1-train_val_frac))
+        start_control = end - timedelta(days=delta.days*(1-train_frac))
         delta = end - start_control
 
         df_control = fetch_alpaca_data(

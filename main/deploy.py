@@ -13,7 +13,7 @@ if __name__ == "__main__":
     
     # predictor = AdaBoostStrategy(
     #     d=10,
-    #     train_val_frac=0.7,
+    #     train_frac=0.7,
     #     cv_splits=5,
     #     param_grid={
     #         'clf__n_estimators': [50, 100],
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     
     strat = AdaBoostStrategy(
         d=10, #10 has the best
-        train_val_frac=0.7,
+        train_frac=0.7,
         cv_splits=5,
         param_grid={
             'clf__n_estimators': [50,100,200],

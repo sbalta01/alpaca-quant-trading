@@ -21,14 +21,12 @@ class AdaBoostStrategy(Strategy):
     Target: sign of ΔMA(d) for d in {5,10,20}.
     """
     name = "AdaBoost"
-    train_val_frac: float
-    val_ratio: float
+    train_frac: float
 
     def __init__(
         self,
         d: int = 5,
-        train_val_frac: float = 0.7,
-        val_ratio: float = 0.25,
+        train_frac: float = 0.7,
         cv_splits: int = 5,
         param_grid: Dict[str, Any] = None,
         random_state: int = 42,
@@ -39,7 +37,7 @@ class AdaBoostStrategy(Strategy):
         ----------
         d          : int
             MA window to predict (5, 10, or 20).
-        train_val_frac : float
+        train_frac : float
             Fraction of data to train on.
         cv_splits  : int
             Number of folds for time-series CV.
@@ -50,8 +48,7 @@ class AdaBoostStrategy(Strategy):
         if d not in (5, 10, 20):
             raise ValueError("d must be one of 5, 10, 20")
         self.d = d
-        self.train_val_frac = train_val_frac
-        self.val_ratio = val_ratio
+        self.train_frac = train_frac
         self.cv_splits = cv_splits
         self.param_grid = param_grid or {
             'clf__n_estimators': [50, 100],
@@ -153,17 +150,11 @@ class AdaBoostStrategy(Strategy):
         X = feat.drop(columns=['open','high','low','close','volume','target'])
         y = feat['target']
 
-        X_temp, X_test, y_temp, y_test = train_test_split(
-            X, y, train_size=self.train_val_frac, shuffle=False
-        )
-
-        X_train, X_val, y_train, y_val = train_test_split(
-            X_temp, y_temp, test_size=self.val_ratio, shuffle=False
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, train_size=self.train_frac, shuffle=False
         )
 
         # 4) Nested CV Grid Search on train+val
-        X_tune = pd.concat([X_train, X_val])
-        y_tune = pd.concat([y_train, y_val])
         tscv = TimeSeriesSplit(n_splits=self.cv_splits)
         gs = GridSearchCV(
             self.pipeline,
@@ -172,7 +163,7 @@ class AdaBoostStrategy(Strategy):
             scoring='accuracy',
             n_jobs=-1
         )
-        gs.fit(X_tune, y_tune)
+        gs.fit(X_train, y_train)
         best = gs.best_estimator_
 
         # 5) Evaluate on test
