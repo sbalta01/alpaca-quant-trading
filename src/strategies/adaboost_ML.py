@@ -2,11 +2,14 @@
 
 import pandas as pd
 import numpy as np
-from typing import List
+from typing import Dict, Any
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
+from sklearn.linear_model import Ridge
+from sklearn.feature_selection import RFE
+from sklearn.model_selection import GridSearchCV, TimeSeriesSplit, KFold, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import confusion_matrix, r2_score
 
 from src.strategies.base_strategy import Strategy
 from src.utils.indicators import sma, ema, rsi
@@ -18,21 +21,25 @@ class AdaBoostStrategy(Strategy):
     Target: sign of ΔMA(d) for d in {5,10,20}.
     """
     name = "AdaBoost"
+    train_val_frac: float
+    val_ratio: float
 
     def __init__(
         self,
         d: int = 5,
-        train_frac: float = 0.7,
+        train_val_frac: float = 0.7,
+        val_ratio: float = 0.25,
         cv_splits: int = 5,
-        param_grid: dict = None,
+        param_grid: Dict[str, Any] = None,
         random_state: int = 42,
+        ratio_outliers:float = 1.5
     ):
         """
         Parameters
         ----------
         d          : int
             MA window to predict (5, 10, or 20).
-        train_frac : float
+        train_val_frac : float
             Fraction of data to train on.
         cv_splits  : int
             Number of folds for time-series CV.
@@ -40,22 +47,36 @@ class AdaBoostStrategy(Strategy):
             Grid for GridSearchCV. Defaults to
             {'clf__n_estimators':[50,100], 'clf__learning_rate':[0.5,1.0]}.
         """
-        if d not in (5,10,20):
+        if d not in (5, 10, 20):
             raise ValueError("d must be one of 5, 10, 20")
         self.d = d
-        self.train_frac = train_frac
-        self.random_state = random_state
+        self.train_val_frac = train_val_frac
+        self.val_ratio = val_ratio
         self.cv_splits = cv_splits
         self.param_grid = param_grid or {
             'clf__n_estimators': [50, 100],
             'clf__learning_rate': [0.5, 1.0]
         }
+        self.random_state = random_state
+        self.ratio_outliers = ratio_outliers
 
-        # build pipeline: scale → AdaBoost
+        # Pipeline: scaler → RFE(Ridge) → AdaBoost
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
+            # ('rfe', RFE(Ridge(random_state=self.random_state), n_features_to_select=32)),
             ('clf', AdaBoostClassifier(random_state=self.random_state))
         ])
+
+    def _remove_outliers(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Drop rows where any feature is outside ratio*IQR."""
+        clean = df.copy()
+        for col in df.columns:
+            q1 = clean[col].quantile(0.25)
+            q3 = clean[col].quantile(0.75)
+            iqr = q3 - q1
+            lo, hi = q1 - self.ratio_outliers * iqr, q3 + self.ratio_outliers * iqr
+            clean = clean[(clean[col] >= lo) & (clean[col] <= hi)]
+        return clean
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute the 32 features from your table."""
@@ -125,16 +146,24 @@ class AdaBoostStrategy(Strategy):
         feat = feat.dropna()
         feat['target'] = feat['target'].astype(int)
 
-        # 2) Split train/test
-        split = int(len(feat) * self.train_frac)
-        train = feat.iloc[:split]
-        test  = feat.iloc[split:]
+        # 2) Remove outliers
+        feat = self._remove_outliers(feat)
 
-        X_train = train.drop(columns=['open','high','low','close','volume','target'])
-        y_train = train['target']
-        X_test  = test.drop(columns=['open','high','low','close','volume','target'])
+        # 3) Split train / val / test (no shuffle)
+        X = feat.drop(columns=['open','high','low','close','volume','target'])
+        y = feat['target']
 
-        # 3) GridSearchCV with time-series split
+        X_temp, X_test, y_temp, y_test = train_test_split(
+            X, y, train_size=self.train_val_frac, shuffle=False
+        )
+
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_temp, y_temp, test_size=self.val_ratio, shuffle=False
+        )
+
+        # 4) Nested CV Grid Search on train+val
+        X_tune = pd.concat([X_train, X_val])
+        y_tune = pd.concat([y_train, y_val])
         tscv = TimeSeriesSplit(n_splits=self.cv_splits)
         gs = GridSearchCV(
             self.pipeline,
@@ -143,14 +172,19 @@ class AdaBoostStrategy(Strategy):
             scoring='accuracy',
             n_jobs=-1
         )
-        gs.fit(X_train, y_train)
+        gs.fit(X_tune, y_tune)
         best = gs.best_estimator_
 
-        # 4) Predict & build signals
-        preds = best.predict(X_test)
+        # 5) Evaluate on test
+        y_pred = best.predict(X_test)
+        cm = confusion_matrix(y_test, y_pred)
+        print("Confusion matrix:\n", cm)
+
+        # 6) Generate signals: only in test period
         signals = pd.Series(0.0, index=feat.index)
+        idxs = list(X_test.index)
         prev_pos = 0
-        for idx, pred in zip(test.index, preds):
+        for idx, pred in zip(idxs, y_pred):
             if pred == 1 and prev_pos == 0:
                 signals.at[idx] = 1.0
                 prev_pos = 1
@@ -160,7 +194,7 @@ class AdaBoostStrategy(Strategy):
             else:
                 signals.at[idx] = 0.0
 
-        # 5) Merge back to full df
+        # 7) Merge back to full
         out = df.copy()
         out['signal'] = signals.reindex(df.index).fillna(0.0)
         return out
