@@ -1,4 +1,4 @@
-# src/strategies/adaboost_ma_predictor.py
+# src/strategies/adaboost_ML.py
 
 import pandas as pd
 import numpy as np

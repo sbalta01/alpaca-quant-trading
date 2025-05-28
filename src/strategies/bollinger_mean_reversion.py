@@ -7,11 +7,11 @@ from src.utils.indicators import sma
 class BollingerMeanReversionStrategy(Strategy):
     """
     Bollinger Bands Mean Reversion:
-      - Lower band = SMA(window) − k * rolling_std(window)
+      - Lower band = SMA(window) - k * rolling_std(window)
       - Upper band = SMA(window) + k * rolling_std(window)
     Signals:
       * Buy (signal=+1) when price < lower band
-      * Sell (signal=−1) when price > upper band
+      * Sell (signal=-1) when price > upper band
       * Hold (signal=0) otherwise
     """
     name = "BollingerMeanReversion"
