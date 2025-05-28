@@ -153,8 +153,8 @@ class BacktestEngine:
                 f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
                 ML_metrics = dict(zip(
                     ['F1 Score', 'Accuracy', 'Precision', 'Recall'],
-                    [[f1_score,'>0.6 good, >0.8 strong. Balance precision-recall'], [accuracy,'>0.7 good. Proportion of correct predictions (Generally biased in trading)'],
-                        [precision,'>0.6 good. Ratio of correct buy predictions of all predictions'], [recall,'>0.6 good. Ratio of buy predicted of all buys']
+                    [[f1_score,'>0.6 good, >0.8 strong. Balance precision-recall'], [accuracy,'>0.7 good. Ratio of correct predictions (Generally biased in trading)'],
+                        [precision,'>0.6 good. Ratio of correct buy predictions of all predictions'], [recall,'>0.6 good. Ratio of buy predictions of all buys']
                         ]))
             except:
                 ML_metrics = {'No ML algorithm': ['','']}

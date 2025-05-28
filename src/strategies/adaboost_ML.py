@@ -59,7 +59,7 @@ class AdaBoostStrategy(Strategy):
         # Pipeline: scaler → RFE(Ridge) → AdaBoost
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            # ('rfe', RFE(Ridge(random_state=self.random_state), n_features_to_select=32)),
+            ('rfe', RFE(Ridge(random_state=self.random_state), n_features_to_select=26)),
             ('clf', AdaBoostClassifier(random_state=self.random_state))
         ])
 

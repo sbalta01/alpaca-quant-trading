@@ -85,12 +85,6 @@ def run_backtest_strategy(
     perf = engine.performance(results,num_years)
     perf_ctrl = engine_control.performance(results_control,num_years)
 
-    print(f"--- Backtest: {strategy.name} on {symbols} ---")
-    print(f"Period       : {start.date()} → {end.date()}")
-    print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
-    print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
-    print(f"Profit       : {perf['Profit']:.2f}  |  Benchmark: {perf_ctrl['Profit']:.2f}")
-    print(f"Final Return       : {perf['Final Return']*100:.2f}%  |  Benchmark: {perf_ctrl['Final Return']*100:.2f}%\n")
     print(f"Max Drawdown       : {perf['Max Drawdown']*100:.2f}%  |  Benchmark: {perf_ctrl['Max Drawdown']*100:.2f}%  |  <-20% risky. Less negative better")
     print(f"CAGR       : {perf['CAGR']*100:.2f}%  |  Benchmark: {perf_ctrl['CAGR']*100:.2f}%  |  >5-10% good. Annualized return, more better")
     print(f"Sharpe       : {perf['Sharpe']:.2f}  |  Benchmark: {perf_ctrl['Sharpe']:.2f}  |  >1 okay, >2 good. Risk adjusted return (Penalizes volatility)")
@@ -102,4 +96,11 @@ def run_backtest_strategy(
     print("ML metrics")
     for key, value in perf['ML metrics'].items():
         print(key + "    : ", f"{value[0]:.2f}  |  ", value[1])
+
+    print(f"--- Backtest: {strategy.name} on {symbols} ---")
+    print(f"Period       : {start.date()} → {end.date()}")
+    print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
+    print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
+    print(f"Profit       : {perf['Profit']:.2f}  |  Benchmark: {perf_ctrl['Profit']:.2f}")
+    print(f"Final Return       : {perf['Final Return']*100:.2f}%  |  Benchmark: {perf_ctrl['Final Return']*100:.2f}%")
     return results, results_control

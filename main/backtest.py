@@ -22,8 +22,8 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    symbols = ["AAPL","AMZN"]
+    symbols = ["AAPL","AMZN","MSFT","GOOG"]
+    # symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -33,9 +33,9 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2015, 5, 10)
-    end     = datetime(2025, 5, 28)
-    # end     = datetime(2025, 1, 1)
+    start   = datetime(2023, 1, 1)
+    # end     = datetime(2025, 5, 28)
+    end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=20, angle_threshold_deg = 45.0, ma = 'ema')
@@ -57,7 +57,7 @@ if __name__ == "__main__":
             'clf__n_estimators': [50,100,200],
             'clf__learning_rate': [0.1,0.5,1.0]
         },
-        # ratio_outliers = 1.5
+        ratio_outliers = 1.5
     )
 
     # predictor = AdaBoostStrategy(
