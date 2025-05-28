@@ -92,25 +92,52 @@ class BacktestEngine:
         final = final.reorder_levels(["symbol", final.index.names[0]])
         return final.sort_index()
 
-    def performance(self, results: pd.DataFrame) -> Dict[str, float]:
-        """
-        Compute basic performance metrics on the backtest results:
-          - total_return       : (final equity / initial cash) − 1
-          - annualized_sharpe  : Sharpe ratio assuming daily bars (252 trading days)
-          - max_drawdown       : worst peak‐to‐trough decline
-        """
-        total_return = results["equity"].iat[-1] / self.initial_cash - 1.0
+    def performance(self, results: pd.DataFrame, num_years) -> Dict[str, float]:
+        """Return expanded metrics: Sharpe, Sortino, Calmar, Turnover, Fitness."""
+        results["equity"] = (results["position"]*results["close"] + results["cash"])
+        initial_cash = results["cash"].groupby(level="timestamp").sum().iloc[0]
+        total_equity = results["equity"].groupby(level="timestamp").sum()
+        final_equity = total_equity.iloc[-1]
+        total_returns = results['returns'].groupby(level="timestamp").mean() #Mean assumes same cash_per_trade for each asset
+        final_returns = total_returns.iloc[-1] 
+        profit = final_equity - initial_cash
+        total_returns_cum = total_equity.pct_change().dropna()
 
-        mean_ret = results["returns"].mean()
-        std_ret  = results["returns"].std(ddof=1) or np.nan
-        sharpe = (mean_ret / std_ret) * np.sqrt(252) if std_ret > 0 else np.nan
+        def metrics(total_returns_cum, total_equity):
+            # Annualization factor
+            ann = np.sqrt(252)
+            mean = np.mean(total_returns_cum); std = np.std(total_returns_cum, ddof=1)
+            sharpe = (mean/std)*ann if std>0 else np.nan
 
-        cumulative_max = results["equity"].cummax()
-        drawdowns = (results["equity"] - cumulative_max) / cumulative_max
-        max_dd = drawdowns.min()
+            # Sortino (only downside)
+            neg = total_returns_cum[total_returns_cum<0]
+            downside = np.std(neg, ddof=1)
+            sortino = (mean/downside)*ann if downside>0 else np.nan
 
-        return {
-            "total_return": total_return,
-            "annualized_sharpe": sharpe,
-            "max_drawdown": max_dd,
-        }
+            # Max drawdown
+            cum = np.cumprod(1+total_returns_cum)
+            peak = np.maximum.accumulate(cum)
+            max_drawdown = np.min(cum/peak -1)
+            # max_drawdown = (((total_returns+1) / (total_returns+1).cummax()) - 1).min() ##Equivalent
+
+            # Calmar = CAGR / |maxDD|
+            cagr = cum.iloc[-1]**(1/num_years) -1
+            # cagr = ((final_returns + 1) ** (1 / num_years) - 1) ##Equivalent
+            calmar = cagr/abs(max_drawdown) if max_drawdown<0 else np.nan
+
+            # Turnover = sum |Δposition| / len
+            pos = total_equity / results['close'].groupby(level="timestamp").mean()  # Avg count share (across all symbols)
+            # approximate turnover as fraction of portfolio traded
+            to = np.mean(np.abs(np.diff(pos)))  
+
+            # Fitness = sharpe / turnover
+            fitness = sharpe / to if to>0 else np.nan
+
+            return initial_cash, final_equity, profit, max_drawdown, cagr, final_returns, sharpe, sortino, calmar, to, fitness
+
+        agg = metrics(total_returns_cum,total_equity)
+        out = dict(zip(
+            ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness'],
+            agg
+        ))
+        return out

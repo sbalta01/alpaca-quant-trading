@@ -40,7 +40,7 @@ def run_backtest_strategy(
     # 1) Fetch historical data
     delta = end - start
     try:
-        train_frac = strategy.train_frac
+        train_val_frac = strategy.train_val_frac
 
         df = fetch_alpaca_data(
         symbol=symbols,
@@ -50,7 +50,7 @@ def run_backtest_strategy(
         feed = feed
         )
 
-        start_control = end - timedelta(days=delta.days*(1-train_frac))
+        start_control = end - timedelta(days=delta.days*(1-train_val_frac))
         delta = end - start_control
 
         df_control = fetch_alpaca_data(
@@ -79,29 +79,22 @@ def run_backtest_strategy(
 
     engine_control = BacktestEngine(strategy=BuyAndHoldStrategy(), data=df_control, initial_cash_per_stock=initial_cash_per_stock)
     results_control = engine_control.run()
+    
+    # 3) Compute performance
+    perf = engine.performance(results,num_years)
+    perf_ctrl = engine_control.performance(results_control,num_years)
 
-
-    # 3) Print summary
-    final_equity = (results.groupby(level='symbol')["position"].last()*results.groupby(level='symbol')["close"].last() + results.groupby(level='symbol')["cash"].last()).sum()
-    initial_cash = results.groupby(level='symbol')["cash"].first().sum()
-    pnl = final_equity - initial_cash
-    ret = pnl / initial_cash
-    ret = results.groupby(level='symbol')["returns"].last().mean()
-    ret_control = results_control.groupby(level='symbol')["returns"].last().mean()
-    max_drawdown = (((results['returns']+1) / (results['returns']+1).cummax()) - 1).min()
-    max_drawdown_control = (((results_control['returns']+1) / (results_control['returns']+1).cummax()) - 1).min()
-    cagr = ((ret + 1) ** (1 / num_years) - 1)
-    cagr_control = ((ret_control + 1) ** (1 / num_years) - 1)
     print(f"--- Backtest: {strategy.name} on {symbols} ---")
     print(f"Period       : {start.date()} → {end.date()}")
-    print(f"Initial Cash : {initial_cash:,.2f}")
-    print(f"Final Equity : {final_equity:,.2f}")
-    print(f"Net P&L      : {pnl:,.2f}")
-    print(f"Max Drawdown (%)   : {max_drawdown*100:,.2f}%") ##Highest possible loss during the process
-    print(f"Max D Control (%)   : {max_drawdown_control*100:,.2f}%")
-    print(f"CAGR (%)   : {cagr*100:,.2f}%")
-    print(f"CAGR Control(%)   : {cagr_control*100:,.2f}%")
-    print(f"Return (%)   : {ret*100:,.2f}%")
-    print(f"Return Control (%)   : {ret_control*100:,.2f}%\n")
-    
+    print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
+    print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
+    print(f"Profit       : {perf['Profit']:.2f}%  |  Benchmark: {perf_ctrl['Profit']:.2f}%")
+    print(f"Max Drawdown       : {perf['Max Drawdown']*100:.2f}%  |  Benchmark: {perf_ctrl['Max Drawdown']*100:.2f}%")
+    print(f"CAGR       : {perf['CAGR']*100:.2f}%  |  Benchmark: {perf_ctrl['CAGR']*100:.2f}%")
+    print(f"Final Return       : {perf['Final Return']*100:.2f}%  |  Benchmark: {perf_ctrl['Final Return']*100:.2f}%\n")
+    print(f"Sharpe       : {perf['Sharpe']:.2f}  |  Benchmark: {perf_ctrl['Sharpe']:.2f}")
+    print(f"Sortino      : {perf['Sortino']:.2f}  |  Benchmark: {perf_ctrl['Sortino']:.2f}")
+    print(f"Calmar       : {perf['Calmar']:.2f}  |  Benchmark: {perf_ctrl['Calmar']:.2f}")
+    print(f"Turnover     : {perf['Turnover']:.4f} |  Benchmark: {perf_ctrl['Turnover']:.4f}")
+    print(f"Fitness      : {perf['Fitness']:.2f} |  Benchmark: {perf_ctrl['Fitness']:.2f}")    
     return results, results_control

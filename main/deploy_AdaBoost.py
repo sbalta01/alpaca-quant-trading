@@ -8,7 +8,7 @@ if __name__ == "__main__":
 
     strat = AdaBoostStrategy(
         d=10, #10 has the best
-        train_frac=0.99,
+        train_val_frac=0.99,
         cv_splits=5,
         param_grid={
             'clf__n_estimators': [50,100,200],

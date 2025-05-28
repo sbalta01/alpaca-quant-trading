@@ -21,9 +21,9 @@ import time
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    symbols = ["SPY"]
+    # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    # symbols = ["AAPL","AMZN"]
+    symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -33,14 +33,14 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2022, 5, 10)
+    start   = datetime(2023, 5, 10)
     end     = datetime(2025, 5, 28)
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=20, angle_threshold_deg = 45.0, ma = 'ema')
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
-    # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
+    # strat = RandomForestStrategy(train_val_frac=0.7, n_estimators=100)
     # strat = RollingWindowStrategy(
     #     train_window=252,        # use ~1 year of daily bars
     #     retrain_every=5,         # retrain weekly
@@ -51,7 +51,8 @@ if __name__ == "__main__":
 
     strat = AdaBoostStrategy(
         d=10, #10 has the best
-        train_frac=0.7,
+        train_val_frac=0.7,
+        val_ratio= 0.25,
         cv_splits=5,
         param_grid={
             'clf__n_estimators': [50,100,200],
@@ -61,7 +62,7 @@ if __name__ == "__main__":
 
     # predictor = AdaBoostStrategy(
     #     d=5,
-    #     train_frac=0.7,
+    #     train_val_frac=0.7,
     #     cv_splits=5,
     #     param_grid={
     #         'clf__n_estimators': [50, 100],
