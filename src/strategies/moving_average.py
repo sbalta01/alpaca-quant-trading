@@ -55,7 +55,7 @@ class MovingAverageStrategy(Strategy):
         df['position'] = (
             (df['ma_short'] > df['ma_long']) &
             (df['angle'].abs() > self.angle_threshold_rad)
-        ).astype(float)
+        ).astype(float) #This is not okay because it sells whenever the two MAs are in parallel regardless of their relative position
 
         # Generate trading orders: +1 for a buy, -1 for a sell
         df['signal'] = df['position'].diff().fillna(0)

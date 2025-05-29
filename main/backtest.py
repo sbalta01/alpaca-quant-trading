@@ -6,6 +6,7 @@ import pandas as pd
 
 from src.data.data_loader import fetch_sp500_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
+from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.strategies.moving_average import MovingAverageStrategy
 from src.strategies.bollinger_mean_reversion import BollingerMeanReversionStrategy
@@ -33,8 +34,9 @@ if __name__ == "__main__":
     # symbols = sp500
 
     start   = datetime(2015, 1, 1)
-    # end     = datetime(2025, 5, 28)
-    end     = datetime(2025, 1, 1)
+    # start   = datetime(2022, 1, 1)
+    end     = datetime(2025, 5, 28)
+    # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=20, angle_threshold_deg = 45.0, ma = 'ema')
@@ -47,18 +49,6 @@ if __name__ == "__main__":
     #     max_depth=3,
     #     random_state=42
     # )
-
-    strat = AdaBoostStrategy(
-        d=10, #10 has the best
-        train_frac=0.7,
-        cv_splits=5,
-        # param_grid={
-        #     'clf__n_estimators': [50,100,200],
-        #     'clf__learning_rate': [0.1,0.5,1.0]
-        # },
-        # ratio_outliers = 1.75,
-        n_iter_search = 50
-    )
 
     # predictor = AdaBoostStrategy(
     #     d=5,
@@ -74,6 +64,34 @@ if __name__ == "__main__":
     #     top_k=1,
     #     n_jobs=-1
     # )
+
+    # strat = AdaBoostStrategy(
+    #     d=10, #10 has the best
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     # param_grid={
+    #     #     'clf__n_estimators': [50,100,200],
+    #     #     'clf__learning_rate': [0.1,0.5,1.0]
+    #     # },
+    #     # ratio_outliers = 1.75,
+    #     n_iter_search = 50
+    # )
+
+    predictor = AdaBoostStrategy(
+        d=10,
+        train_frac=0.7,
+        cv_splits=5,
+        # leave param_grid=None for broad RandomizedSearch
+        n_iter_search = 50
+    )
+    strat = HybridAdaBoostFilterStrategy(
+        predictor=predictor,
+        short_ma=9,
+        long_ma=20,
+        angle_threshold_deg=10,
+        atr_window=14,
+        vol_threshold=0.01
+    )
 
     start_backtest = time.perf_counter()
 

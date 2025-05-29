@@ -26,7 +26,7 @@ class MomentumRankingAdaBoostStrategy(Strategy):
         self.predictor = predictor
         self.top_k = top_k
         self.n_jobs = n_jobs
-        self.train_val_frac = self.predictor.train_val_frac
+        self.train_frac = self.predictor.train_frac
 
     def _fit_symbol(self, symbol: str, df_sym: pd.DataFrame) -> Tuple[str, List[pd.Timestamp], np.ndarray]:
         """
@@ -42,7 +42,7 @@ class MomentumRankingAdaBoostStrategy(Strategy):
         )
         feat = feat.dropna(subset=["target"])
         # 2) Split train / test
-        split = int(len(feat) * self.predictor.train_val_frac)
+        split = int(len(feat) * self.predictor.train_frac)
         train = feat.iloc[:split]
         test  = feat.iloc[split:]
         # 3) Prepare arrays

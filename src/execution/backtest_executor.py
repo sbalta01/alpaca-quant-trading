@@ -93,11 +93,14 @@ def run_backtest_strategy(
     print(f"Turnover     : {perf['Turnover']:.4f} |  Benchmark: {perf_ctrl['Turnover']:.4f}  |  0.1-0.5 okay/good, >1 bad. Higher is worse (unless transaction-free)")
     print(f"Fitness      : {perf['Fitness']:.2f} |  Benchmark: {perf_ctrl['Fitness']:.2f}  |  >1 strong. Good for comparing strategies (How good is my strategy per trade)\n")
 
-    print("ML metrics")
-    for key, value in perf['ML metrics'].items():
-        print(key + "    : ", f"{value[0]:.2f}  |  ", value[1])
+    try:
+        print("ML metrics")
+        for key, value in perf['ML metrics'].items():
+            print(key + "    : ", f"{value[0]:.2f}  |  ", value[1])
+    except:
+        pass
 
-    print(f"--- Backtest: {strategy.name} on {symbols} ---")
+    print(f"\n--- Backtest: {strategy.name} on {symbols} ---")
     print(f"Period       : {start.date()} → {end.date()}")
     print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
     print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
