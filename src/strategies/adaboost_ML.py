@@ -20,7 +20,7 @@ class AdaBoostStrategy(Strategy):
     Target: sign of ΔMA(d) for d in {5,10,20}.
     """
     name = "AdaBoost"
-    multi_symbol = True
+    multi_symbol = False
 
     def __init__(
         self,
