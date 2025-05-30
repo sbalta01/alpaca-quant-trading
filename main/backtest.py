@@ -13,6 +13,7 @@ from src.strategies.bollinger_mean_reversion import BollingerMeanReversionStrate
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_returns, plot_signals
 from src.strategies.random_forest_ML import RandomForestStrategy
+from src.strategies.regime_switching_factor_ML import RegimeSwitchingFactorStrategy
 from src.strategies.rolling_window_ML import RollingWindowStrategy
 
 import time
@@ -21,9 +22,9 @@ import time
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    symbols = ["SPY"]
+    # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    # symbols = ["AAPL","AMZN"]
+    symbols = ["AAPL","AMZN"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -33,8 +34,8 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    start   = datetime(2015, 1, 1)
-    # start   = datetime(2025, 1, 1)
+    # start   = datetime(2015, 1, 1)
+    start   = datetime(2023, 1, 1)
     end     = datetime(2025, 5, 28)
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -68,10 +69,10 @@ if __name__ == "__main__":
         d=10, #10 has the best
         train_frac=0.7,
         cv_splits=5,
-        # param_grid={
-        #     'clf__n_estimators': [50,100,200],
-        #     'clf__learning_rate': [0.1,0.5,1.0]
-        # },
+        param_grid={
+            'clf__n_estimators': [50,100,200],
+            'clf__learning_rate': [0.1,0.5,1.0]
+        },
         # ratio_outliers = 1.75,
         n_iter_search = 50
     )
@@ -80,8 +81,11 @@ if __name__ == "__main__":
     #     d=10,
     #     train_frac=0.7,
     #     cv_splits=5,
-    #     # leave param_grid=None for broad RandomizedSearch
-    #     # ratio_outliers = 1.75,
+    #     param_grid={
+    #         'clf__n_estimators': [50,100,200],
+    #         'clf__learning_rate': [0.1,0.5,1.0]
+    #     },
+    #     # ratio_outliers = 3.00,
     #     n_iter_search = 50
     # )
     # strat = HybridAdaBoostFilterStrategy(
@@ -91,6 +95,17 @@ if __name__ == "__main__":
     #     angle_threshold_deg=10,
     #     atr_window=14,
     #     vol_threshold=0.01
+    # )
+
+    # strat = RegimeSwitchingFactorStrategy(
+    #     regime_symbol = "SPY",
+    #     hmm_states = 3,
+    #     hmm_window = 2707,
+    #     vol_window = 10,
+    #     return_col = "close",
+    #     vol_threshold = 0.3,
+    #     ret_threshold = 0.5,
+    #     random_state = 42
     # )
 
     start_backtest = time.perf_counter()
