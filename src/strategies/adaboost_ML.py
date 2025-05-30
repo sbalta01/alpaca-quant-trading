@@ -190,6 +190,10 @@ class AdaBoostStrategy(Strategy):
         gs.fit(X_train, y_train)
         best = gs.best_estimator_
 
+        train_acc = gs.score(X_train, y_train)
+        test_acc  = gs.score(X_test,  y_test)
+        print(f"Train acc: {train_acc:.3f}, Test acc: {test_acc:.3f}")
+
         # 5) Evaluate on test
         y_pred = best.predict(X_test)
 

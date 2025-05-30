@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from typing import Tuple, List, Dict
 from joblib import Parallel, delayed
-from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit, GridSearchCV
 
 from src.strategies.base_strategy import Strategy
 from src.strategies.adaboost_ML  import AdaBoostStrategy
@@ -27,6 +27,8 @@ class MomentumRankingAdaBoostStrategy(Strategy):
         self.top_k = top_k
         self.n_jobs = n_jobs
         self.train_frac = self.predictor.train_frac
+        self.param_grid = self.predictor.param_grid
+        self.pipeline = self.predictor.pipeline
 
     def _fit_symbol(self, symbol: str, df_sym: pd.DataFrame) -> Tuple[str, List[pd.Timestamp], np.ndarray]:
         """
@@ -51,14 +53,32 @@ class MomentumRankingAdaBoostStrategy(Strategy):
         X_test  = test.drop(columns=["open","high","low","close","volume","target"])
         timestamps_test = list(test.index)
         # 4) Grid-search once per symbol
-        tscv = TimeSeriesSplit(n_splits=self.predictor.cv_splits)
-        gs = GridSearchCV(
-            self.predictor.pipeline,
-            self.predictor.param_grid,
-            cv=tscv,
-            scoring="accuracy",
-            n_jobs=1
-        )
+        outer_cv = TimeSeriesSplit(n_splits=self.predictor.cv_splits)
+
+        if isinstance(self.param_grid, dict) and all(
+            hasattr(v, "rvs") for v in self.param_grid.values()
+        ):
+            # The user did NOT supply a fixed grid then use RandomizedSearchCV
+            gs = RandomizedSearchCV(
+                estimator=self.predictor.pipeline,
+                param_distributions=self.predictor.param_grid,
+                n_iter=self.predictor.n_iter_search,
+                cv=outer_cv,
+                scoring='accuracy',
+                random_state=self.predictor.random_state,
+                n_jobs=-1
+            )
+            print('Random Search CV')
+        else:
+            # User supplied a fixed param_grid then exhaustive GridSearch
+            gs = GridSearchCV(
+                estimator=self.predictor.pipeline,
+                param_grid=self.predictor.param_grid,
+                cv=outer_cv,
+                scoring='accuracy',
+                n_jobs=-1
+            )
+            print('Grid Search CV')
         gs.fit(X_train, y_train)
         # 5) Predict probabilities for all test rows
         probs = gs.best_estimator_.predict_proba(X_test)[:,1]
