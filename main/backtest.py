@@ -4,17 +4,10 @@ from datetime import datetime, timedelta
 from alpaca.data.timeframe import TimeFrame
 import pandas as pd
 
-from src.data.data_loader import fetch_sp500_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
-from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
-from src.strategies.moving_average import MovingAverageStrategy
-from src.strategies.bollinger_mean_reversion import BollingerMeanReversionStrategy
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_returns, plot_signals
-from src.strategies.random_forest_ML import RandomForestStrategy
-from src.strategies.regime_switching_factor_ML import RegimeSwitchingFactorStrategy
-from src.strategies.rolling_window_ML import RollingWindowStrategy
 
 import time
 
