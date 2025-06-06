@@ -52,7 +52,6 @@ class MomentumRankingAdaBoostStrategy(Strategy):
             )
             print('Random Search CV')
         else:
-            # User supplied a fixed param_grid then exhaustive GridSearch
             gs = GridSearchCV(
                 estimator=self.pipeline,
                 param_grid=self.param_grid,

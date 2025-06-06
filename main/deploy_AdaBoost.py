@@ -17,7 +17,7 @@ if __name__ == "__main__":
         n_iter_search = 50
     )
 
-    lookback_time = 3*365*24*60 #Train foor three years
+    lookback_time = 3*365*24*60 #Train for three years
     run_live_strategy(
         strat,
         symbols=symbols,

@@ -23,8 +23,8 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    # symbols = ["AAPL","AMZN"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG"]
+    symbols = ["AAPL","AMZN"]
     # symbols = ["HAG.DE"]
 
     # fetch_sp500_symbols()
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     )
     strat = MomentumRankingAdaBoostStrategy(
         predictor=predictor,
-        top_k=2,
+        top_k=1,
     )
 
     # strat = AdaBoostStrategy(
