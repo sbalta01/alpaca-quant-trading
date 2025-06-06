@@ -23,6 +23,18 @@ def fetch_sp500_symbols():
     df[['Symbol']].to_csv('sp500.csv', index=False)
     print("sp500.csv created with", len(df), "symbols.")
 
+def fetch_nasdaq_100_symbols():
+    url = "https://en.wikipedia.org/wiki/NASDAQ-100"
+    tables = pd.read_html(url)
+    
+    # First table on the page is the component list
+    df = tables[4]  # As of now, table 4 contains the companies
+    symbols = df['Ticker'].tolist()
+    
+    # Some tickers have "." instead of "-", fix for Yahoo Finance
+    symbols = [s.replace('.', '-') for s in symbols]
+    return symbols
+
 def load_csv_data(filepath: str) -> pd.DataFrame:
     df = pd.read_csv(filepath, parse_dates=['date'])
     df.set_index('date', inplace=True)

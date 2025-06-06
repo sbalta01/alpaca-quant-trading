@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from alpaca.data.timeframe import TimeFrame
 import pandas as pd
 
+from src.data.data_loader import fetch_nasdaq_100_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.execution.backtest_executor import run_backtest_strategy
@@ -26,7 +27,9 @@ if __name__ == "__main__":
     sp500.remove('GEHC')
     sp500.remove('KVUE')
     sp500.remove('VLTO')
-    symbols = sp500
+    # symbols = sp500
+    
+    symbols = fetch_nasdaq_100_symbols()
 
     # start   = datetime(2016, 1, 1)
     start   = datetime(2022, 1, 1)
