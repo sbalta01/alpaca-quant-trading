@@ -3,6 +3,8 @@
 import pandas as pd
 from datetime import datetime
 from typing import List, Union
+import yfinance as yf
+
 
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
@@ -71,3 +73,92 @@ def fetch_alpaca_data(
     df = bars.sort_index()
     df.index.set_names(["symbol", "timestamp"], inplace=True)
     return df
+
+def fetch_yahoo_data(
+    symbol: Union[str, List[str]],
+    start: datetime,
+    end: datetime,
+    timeframe: str = "1d",
+    feed: str = None
+) -> pd.DataFrame:
+    """
+    Fetch OHLCV from Yahoo Finance for one or more tickers (including non-US,
+    e.g. German: 'BMW.DE', 'SAP.DE'). Returns:
+      - If `symbol` is a string: DataFrame [timestamp] * [open, high, low, close, volume]
+      - If `symbol` is a list: MultiIndex DataFrame [symbol, timestamp] * [open, high, low, close, volume]
+
+    Parameters
+    ----------
+    symbol : str or list of str
+        One or more Yahoo Finance tickers, e.g. "BMW.DE" or ["BMW.DE","SAP.DE"].
+    start   : datetime
+        Inclusive start date for fetch.
+    end     : datetime
+        Inclusive end date for fetch.
+    timeframe: str
+        Data timeframe; e.g., "1d", "1h", "5m", etc., as per yfinance API.
+    """
+    # Use yfinance.download which handles both single and list tickers
+    if isinstance(symbol, str):
+        tickers = symbol
+    else:
+        tickers = " ".join(symbol)
+
+    # yfinance returns a DataFrame with columns like ('Adj Close','close'), etc.
+    df = yf.download(
+        tickers=tickers,
+        start=start.strftime("%Y-%m-%d"),
+        end=end.strftime("%Y-%m-%d"),
+        interval=timeframe,
+        group_by="ticker",  # if multiple, group columns under each ticker
+        auto_adjust=False,  # do not auto‐adjust; keep raw OHLCV
+        threads=True,
+        progress=False
+    )
+
+    # If single symbol: df.columns = ['Open','High','Low','Close','Adj Close','Volume']
+    if isinstance(symbol, str):
+        df = df.rename(
+            columns={
+                "Open": "open",
+                "High": "high",
+                "Low": "low",
+                "Close": "close",
+                "Volume": "volume"
+            }
+        )[
+            ["open", "high", "low", "close", "volume"]
+        ].dropna()
+        df.index.name = "timestamp"
+        return df
+
+    # If multiple symbol: df is a DataFrame with columns MultiIndex (symbol, field)
+    # e.g., df['BMW.DE']['Open'], df['BMW.DE']['Close'], etc.
+    # We’ll stack it into a MultiIndex as [symbol, timestamp] → [open, high, low, close, volume]
+    data_frames = []
+    for sym in symbol:
+        if (sym, "Close") not in df.columns:
+            # No data for this symbol—skip
+            continue
+        tmp = df[sym].rename(
+            columns={
+                "Open": "open",
+                "High": "high",
+                "Low": "low",
+                "Close": "close",
+                "Volume": "volume"
+            }
+        )[
+            ["open", "high", "low", "close", "volume"]
+        ].dropna()
+        tmp.index.name = "timestamp"
+        # Attach symbol as an outer index level
+        tmp["symbol"] = sym
+        tmp = tmp.reset_index().set_index(["symbol", "timestamp"])
+        data_frames.append(tmp)
+
+    if not data_frames:
+        raise ValueError(f"No data fetched for any of {symbol}")
+
+    out = pd.concat(data_frames).sort_index()
+    return out
