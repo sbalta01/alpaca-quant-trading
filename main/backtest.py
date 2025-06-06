@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # symbols = ["HAG.DE"]
 
     # fetch_sp500_symbols()
-    sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
+    sp500 = pd.read_csv("sp500.csv")["Symbol"].to_list()
     sp500.remove('CEG')
     sp500.remove('GEHC')
     sp500.remove('KVUE')
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     symbols = sp500
 
     # start   = datetime(2016, 1, 1)
-    start   = datetime(2025, 6, 1)
+    start   = datetime(2022, 1, 1)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
