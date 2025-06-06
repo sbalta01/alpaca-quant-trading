@@ -10,10 +10,10 @@ if __name__ == "__main__":
         d=10, #10 has the best
         train_frac=0.99,
         cv_splits=5,
-        # param_grid={
-        #     'clf__n_estimators': [50,100,200],
-        #     'clf__learning_rate': [0.1,0.5,1.0]
-        # },
+        param_grid={
+            'clf__n_estimators': [50,100,200],
+            'clf__learning_rate': [0.1,0.5,1.0]
+        },
         n_iter_search = 50
     )
 
