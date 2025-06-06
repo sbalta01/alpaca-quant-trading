@@ -1,0 +1,37 @@
+name: Trading Backtest
+run-name: ${{ github.actor }} is backtesting a quant trading algorithm. 
+
+on: workflow_dispatch
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: ${{ secrets.API_KEY }}
+      API_SECRET: ${{ secrets.API_SECRET }}
+      PAPER: True
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Backtest strategy
+        env:
+            PYTHONPATH: ${{ github.workspace }}
+        
+        run: python main/backtest.py

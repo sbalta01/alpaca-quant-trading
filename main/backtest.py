@@ -24,7 +24,7 @@ if __name__ == "__main__":
     # symbols = ["USO"]
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    symbols = ["AAPL","AMZN"]
+    # symbols = ["AAPL","AMZN"]
     # symbols = ["HAG.DE"]
 
     # fetch_sp500_symbols()
@@ -33,10 +33,10 @@ if __name__ == "__main__":
     sp500.remove('GEHC')
     sp500.remove('KVUE')
     sp500.remove('VLTO')
-    # symbols = sp500
+    symbols = sp500
 
     # start   = datetime(2016, 1, 1)
-    start   = datetime(2022, 1, 1)
+    start   = datetime(2025, 6, 1)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     )
     strat = MomentumRankingAdaBoostStrategy(
         predictor=predictor,
-        top_k=1,
+        top_k=10,
     )
 
     # strat = AdaBoostStrategy(
