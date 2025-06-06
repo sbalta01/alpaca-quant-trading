@@ -74,14 +74,17 @@ class AdaBoostStrategy(Strategy):
 
     def _remove_outliers(self, df: pd.DataFrame) -> pd.DataFrame:
         """Drop rows where any feature is outside ratio*IQR."""
-        clean = df.copy()
-        for col in df.columns:
-            q1 = clean[col].quantile(0.25)
-            q3 = clean[col].quantile(0.75)
-            iqr = q3 - q1
-            lo, hi = q1 - self.ratio_outliers * iqr, q3 + self.ratio_outliers * iqr
-            clean = clean[(clean[col] >= lo) & (clean[col] <= hi)]
-        return clean
+        if self.ratio_outliers == np.inf:
+            return df
+        else:
+            clean = df.copy()
+            for col in df.columns:
+                q1 = clean[col].quantile(0.25)
+                q3 = clean[col].quantile(0.75)
+                iqr = q3 - q1
+                lo, hi = q1 - self.ratio_outliers * iqr, q3 + self.ratio_outliers * iqr
+                clean = clean[(clean[col] >= lo) & (clean[col] <= hi)]
+            return clean
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute the 32 features from your table."""
@@ -138,7 +141,7 @@ class AdaBoostStrategy(Strategy):
         mean_dev = tp.rolling(10).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
         df['CCI'] = (tp - ma_tp) / (0.015 * mean_dev)
 
-        return df.dropna()
+        return df.dropna() #Because of this there is a slight mismatch between start control and the start of the ML strat
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         df = data.copy()
@@ -146,7 +149,7 @@ class AdaBoostStrategy(Strategy):
         feat = self._compute_features(df)
         # target = sign of ΔMA(d)
         feat['target'] = (feat[f'MA{self.d}'].shift(-1) > feat[f'MA{self.d}']).astype(int)
-        feat = feat.dropna()
+        feat = feat.dropna() #Because of this there is a slight mismatch between start control and the start of the ML strat
         feat['target'] = feat['target'].astype(int)
 
         # 2) Remove outliers
