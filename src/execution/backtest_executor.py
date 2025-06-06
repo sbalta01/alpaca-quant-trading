@@ -5,8 +5,8 @@ from typing import Union, List
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
-from src.data.data_loader import fetch_alpaca_data
 from src.backtesting.backtester import BacktestEngine
 from src.strategies.base_strategy import Strategy
 from src.strategies.buy_and_hold import BuyAndHoldStrategy
@@ -39,22 +39,47 @@ def run_backtest_strategy(
         MultiIndex [symbol, timestamp] if multiple symbols, else DatetimeIndex.
     """
     # 1) Fetch historical data
-    delta = end - start
     try:
-        train_frac = strategy.train_frac
-
-        df = fetch_alpaca_data(
+        from src.data.data_loader import fetch_alpaca_data as fetch_data
+        df = fetch_data(
         symbol=symbols,
         start=start,
         end=end,
         timeframe=timeframe,
         feed = feed
         )
+        print('USING ALPACA DATA')
+    except:
+        from src.data.data_loader import fetch_yahoo_data as fetch_data
+        print('USING YAHOO DATA')
+        print('Timeframe automatically set to day')
+        timeframe = '1d'
+        feed = None
 
-        start_control = end - timedelta(days=delta.days*(1-train_frac))
-        delta = end - start_control
+    delta = end - start
+    try:
+        train_frac = strategy.train_frac
 
-        df_control = fetch_alpaca_data(
+        df = fetch_data(
+        symbol=symbols,
+        start=start,
+        end=end,
+        timeframe=timeframe,
+        feed = feed
+        )
+        df_single = fetch_data(
+        symbol=[symbols[0]],
+        start=start,
+        end=end,
+        timeframe=timeframe,
+        feed = feed
+        )
+        _, df_control_single, _, _ = train_test_split(
+            df_single, df_single, train_size=train_frac, shuffle=False
+        )
+        start_control = list(df_control_single.droplevel('symbol').index)[0]
+        delta = end.date() - start_control.date()
+        df_control = fetch_data(
         symbol=symbols,
         start=start_control,
         end=end,
@@ -63,7 +88,7 @@ def run_backtest_strategy(
         )
 
     except:
-        df = fetch_alpaca_data(
+        df = fetch_data(
         symbol=symbols,
         start=start,
         end=end,
@@ -72,7 +97,6 @@ def run_backtest_strategy(
         )
         df_control = df.copy()
     num_years = delta.days / 365
-
     # 2) Initialize and run backtest
     engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock)
     results = engine.run()
@@ -101,7 +125,7 @@ def run_backtest_strategy(
         pass
 
     print(f"\n--- Backtest: {strategy.name} on {symbols} ---")
-    print(f"Period       : {start.date()} → {end.date()}")
+    print(f"Period       : {start_control.date()} → {end.date()}")
     print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
     print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
     print(f"Profit       : {perf['Profit']:.2f}  |  Benchmark: {perf_ctrl['Profit']:.2f}")
