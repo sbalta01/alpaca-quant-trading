@@ -23,8 +23,9 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    symbols = ["AAPL","AMZN"]
+    symbols = ["AAPL","AMZN","MSFT","GOOG"]
+    # symbols = ["AAPL","AMZN"]
+    # symbols = ["HAG.DE"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].tolist()
@@ -34,9 +35,9 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    # start   = datetime(2015, 1, 1)
-    start   = datetime(2023, 1, 1)
-    end     = datetime(2025, 5, 28)
+    # start   = datetime(2016, 1, 1)
+    start   = datetime(2022, 1, 1)
+    end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
@@ -51,22 +52,8 @@ if __name__ == "__main__":
     #     random_state=42
     # )
 
-    # predictor = AdaBoostStrategy(
-    #     d=10,
-    #     train_frac=0.7,
-    #     cv_splits=5,
-    #     # leave param_grid=None for broad RandomizedSearch
-    #     # ratio_outliers = 1.75,
-    #     n_iter_search = 50
-    # )
-    # strat = MomentumRankingAdaBoostStrategy(
-    #     predictor=predictor,
-    #     top_k=1,
-    #     n_jobs=-1
-    # )
-
-    strat = AdaBoostStrategy(
-        d=10, #10 has the best
+    predictor = AdaBoostStrategy(
+        d=10,
         train_frac=0.7,
         cv_splits=5,
         param_grid={
@@ -76,6 +63,23 @@ if __name__ == "__main__":
         # ratio_outliers = 1.75,
         n_iter_search = 50
     )
+    strat = MomentumRankingAdaBoostStrategy(
+        predictor=predictor,
+        top_k=2,
+        n_jobs=-1
+    )
+
+    # strat = AdaBoostStrategy(
+    #     d=10, #10 has the best
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     param_grid={
+    #         'clf__n_estimators': [50,100,200],
+    #         'clf__learning_rate': [0.1,0.5,1.0]
+    #     },
+    #     # ratio_outliers = 1.75,
+    #     n_iter_search = 50
+    # )
 
     # predictor = AdaBoostStrategy(
     #     d=10,
@@ -97,16 +101,26 @@ if __name__ == "__main__":
     #     vol_threshold=0.01
     # )
 
-    # strat = RegimeSwitchingFactorStrategy(
-    #     regime_symbol = "SPY",
+    # strat = RegimeSwitchingFactorStrategy( #Usually trained daily for 7 year window
+    #     regime_symbol = "HAG.DE",
     #     hmm_states = 3,
-    #     hmm_window = 2707,
     #     vol_window = 10,
-    #     return_col = "close",
-    #     vol_threshold = 0.3,
-    #     ret_threshold = 0.5,
+    #     vol_thresh = 0.3,
+    #     ret_thresh = 0.5,
     #     random_state = 42
     # )
+
+    # strat = AdaBoostStrategy(
+    #         d=10,
+    #         train_frac=0.7,
+    #         cv_splits=5,
+    #         param_grid={
+    #             'clf__n_estimators': [50,100,200],
+    #             'clf__learning_rate': [0.1,0.5,1.0]
+    #         },
+    #         # ratio_outliers = 3.00,
+    #         n_iter_search = 50,
+    #     )
 
     start_backtest = time.perf_counter()
 
@@ -116,8 +130,9 @@ if __name__ == "__main__":
         start=start,
         end=end,
         timeframe=timeframe,
+        # timeframe="1d",
         initial_cash_per_stock=10_000,
-        feed = None
+        # feed = 'iex'
     )
 
     end_backtest = time.perf_counter()
