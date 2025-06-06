@@ -66,7 +66,6 @@ if __name__ == "__main__":
     strat = MomentumRankingAdaBoostStrategy(
         predictor=predictor,
         top_k=2,
-        n_jobs=-1
     )
 
     # strat = AdaBoostStrategy(

@@ -2,12 +2,9 @@
 
 import pandas as pd
 import numpy as np
-from typing import Tuple, List, Dict
-from joblib import Parallel, delayed
 from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit, GridSearchCV
-
 from src.strategies.base_strategy import Strategy
-from src.strategies.adaboost_ML  import AdaBoostStrategy
+from src.strategies.adaboost_ML import AdaBoostStrategy
 
 class MomentumRankingAdaBoostStrategy(Strategy):
     """
@@ -17,51 +14,36 @@ class MomentumRankingAdaBoostStrategy(Strategy):
     name = "MomentumRankingAdaBoost"
     multi_symbol = True
 
-    def __init__(
-        self,
-        predictor: AdaBoostStrategy,
-        top_k: int = 10,
-        n_jobs: int = -1
-    ):
+    def __init__(self, predictor: AdaBoostStrategy, top_k: int = 10):
         self.predictor = predictor
         self.top_k = top_k
-        self.n_jobs = n_jobs
         self.train_frac = self.predictor.train_frac
         self.param_grid = self.predictor.param_grid
         self.pipeline = self.predictor.pipeline
 
-    def _fit_symbol(self, symbol: str, df_sym: pd.DataFrame) -> Tuple[str, List[pd.Timestamp], np.ndarray]:
-        """
-        Fit on the train slice of df_sym, then return:
-          - symbol
-          - test timestamps
-          - array of predicted probabilities for each test timestamp
-        """
-        # 1) Build features & target
+    def _fit_and_predict(self, df_sym: pd.DataFrame) -> pd.Series:
         feat = self.predictor._compute_features(df_sym)
         feat["target"] = np.sign(
             feat[f"MA{self.predictor.d}"].shift(-1) - feat[f"MA{self.predictor.d}"]
         )
         feat = feat.dropna(subset=["target"])
-        # 2) Split train / test
+
         split = int(len(feat) * self.predictor.train_frac)
         train = feat.iloc[:split]
-        test  = feat.iloc[split:]
-        # 3) Prepare arrays
-        X_train = train.drop(columns=["open","high","low","close","volume","target"])
-        y_train = train["target"].astype(int)
-        X_test  = test.drop(columns=["open","high","low","close","volume","target"])
-        timestamps_test = list(test.index)
-        # 4) Grid-search once per symbol
-        outer_cv = TimeSeriesSplit(n_splits=self.predictor.cv_splits)
+        test = feat.iloc[split:]
 
+        X_train = train.drop(columns=["open", "high", "low", "close", "volume", "target"])
+        y_train = train["target"].astype(int)
+        X_test = test.drop(columns=["open", "high", "low", "close", "volume", "target"])
+
+        outer_cv = TimeSeriesSplit(n_splits=self.predictor.cv_splits)
+        
         if isinstance(self.param_grid, dict) and all(
             hasattr(v, "rvs") for v in self.param_grid.values()
         ):
-            # The user did NOT supply a fixed grid then use RandomizedSearchCV
             gs = RandomizedSearchCV(
-                estimator=self.predictor.pipeline,
-                param_distributions=self.predictor.param_grid,
+                estimator=self.pipeline,
+                param_distributions=self.param_grid,
                 n_iter=self.predictor.n_iter_search,
                 cv=outer_cv,
                 scoring='accuracy',
@@ -72,66 +54,50 @@ class MomentumRankingAdaBoostStrategy(Strategy):
         else:
             # User supplied a fixed param_grid then exhaustive GridSearch
             gs = GridSearchCV(
-                estimator=self.predictor.pipeline,
-                param_grid=self.predictor.param_grid,
+                estimator=self.pipeline,
+                param_grid=self.param_grid,
                 cv=outer_cv,
                 scoring='accuracy',
                 n_jobs=-1
             )
             print('Grid Search CV')
         gs.fit(X_train, y_train)
-        # 5) Predict probabilities for all test rows
-        probs = gs.best_estimator_.predict_proba(X_test)[:,1]
-        return symbol, timestamps_test, probs
+        probs = pd.Series(
+            gs.best_estimator_.predict_proba(X_test)[:, 1],
+            index=test.index
+        )
+        return probs
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
-        """
-        data: MultiIndex ['symbol','timestamp'] → must include 'close','volume',etc.
-        Returns full MultiIndex signals over all timestamps and symbols.
-        """
-        if not isinstance(data.index, pd.MultiIndex) or \
-           data.index.names != ["symbol","timestamp"]:
+        if not isinstance(data.index, pd.MultiIndex) or data.index.names != ["symbol", "timestamp"]:
             raise ValueError("Index must be MultiIndex ['symbol','timestamp'].")
 
-        symbols    = data.index.get_level_values("symbol").unique()
-        timestamps = sorted(data.index.get_level_values("timestamp").unique())
-        # 0) Fit & predict per symbol once, gathering test timestamps & probs
-        groups = [(sym, data.xs(sym, level="symbol")) for sym in symbols]
-        fitted = Parallel(n_jobs=self.n_jobs)(
-            delayed(self._fit_symbol)(sym, df_sym) for sym, df_sym in groups
-        )
-        # 1) Build prob_panels and collect all test timestamps
-        prob_panels = {}
-        test_ts_all = set()
-        for sym, ts_list, probs in fitted:
-            prob_panels[sym] = pd.Series(probs, index=ts_list)
-            test_ts_all.update(ts_list)
+        df = data.copy()
+        symbols = df.index.get_level_values("symbol").unique()
+        probs_df = []
 
-        # 2) At each timestamp, rank symbols by prob_up and mark top_k
-        idx_tuples = []
-        all_positions = []
-        for t in timestamps:
-            # only generate non-zero signals if t is in the test period
-            if t not in test_ts_all:
-                # pre‐test: everyone flat
-                for sym in symbols:
-                    idx_tuples.append((sym, t))
-                    all_positions.append(0.0)
-            else:
-                # build cross‐section for t
-                row = {sym: prob_panels[sym].get(t, 0.0) for sym in symbols}
-                # rank
-                ranked = sorted(row.items(), key=lambda x: x[1], reverse=True)
-                top_syms = {sym for sym, _ in ranked[: self.top_k]}
+        # Compute probs for each symbol (serially)
+        for sym in symbols:
+            df_sym = df.xs(sym, level="symbol")
+            probs = self._fit_and_predict(df_sym)
+            probs_df.append(pd.DataFrame({"symbol": sym, "timestamp": probs.index, "prob": probs.values}))
 
-                # record signals
-                for sym in symbols:
-                    idx_tuples.append((sym, t))
-                    all_positions.append(1.0 if sym in top_syms else 0.0)
+        # Combine all probabilities into a single DataFrame
+        probs_all = pd.concat(probs_df).set_index(["symbol", "timestamp"])
+        probs_all = probs_all.sort_index()
 
-        idx = pd.MultiIndex.from_tuples(idx_tuples, names=["symbol","timestamp"])
-        out = pd.DataFrame(index=idx)
-        out["position"] = all_positions
-        data['position'] = out["position"]
-        data['signal'] = data.groupby(level='symbol')['position'].diff().fillna(0)
-        return data
+        # Rank by timestamp
+        prob_pivot = probs_all.reset_index().pivot(index="timestamp", columns="symbol", values="prob")
+        top_k_mask = prob_pivot.apply(lambda row: row.nlargest(self.top_k).index, axis=1)
+
+        # Build MultiIndex for position signals
+        idx = pd.MultiIndex.from_product([symbols, prob_pivot.index], names=["symbol", "timestamp"])
+        position = pd.Series(0.0, index=idx)
+
+        for t, top_syms in top_k_mask.items():
+            position.loc[(list(top_syms), t)] = 1.0
+
+        # Build final DataFrame
+        df["position"] = position.sort_index().reindex(df.index).fillna(0.0)
+        df["signal"] = df.groupby(level="symbol")["position"].diff().fillna(0.0)
+        return df
