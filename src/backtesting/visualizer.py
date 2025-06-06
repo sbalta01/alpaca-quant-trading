@@ -85,6 +85,7 @@ def plot_signals(
     ax.set_ylabel("Price")
     ax.set_title(title)
     ax.set_xlim(results_control.index.get_level_values('timestamp')[0], results_control.index.get_level_values('timestamp')[-1])
+    ax.set_ylim(results_control['close'].min()*0.75, results_control['close'].max()*1.25)
     ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
     fig.autofmt_xdate()
     plt.tight_layout()
