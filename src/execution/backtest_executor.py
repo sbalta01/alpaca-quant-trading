@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from src.backtesting.backtester import BacktestEngine
 from src.strategies.base_strategy import Strategy
 from src.strategies.buy_and_hold import BuyAndHoldStrategy
-from alpaca.data.timeframe import TimeFrame
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 def run_backtest_strategy(
     strategy: Strategy,
@@ -52,8 +52,22 @@ def run_backtest_strategy(
     except:
         from src.data.data_loader import fetch_yahoo_data as fetch_data
         print('USING YAHOO DATA')
-        print('Timeframe automatically set to day')
-        timeframe = '1d'
+        if timeframe.unit_value == TimeFrameUnit.Month:
+            print('Timeframe set to Month')
+            timeframe = '1mo'
+        elif timeframe.unit_value == TimeFrameUnit.Week:
+            print('Timeframe set to Week')
+            timeframe = '1wk'
+        elif timeframe.unit_value == TimeFrameUnit.Day:
+            print('Timeframe set to Day')
+            timeframe = '1d'
+        elif timeframe.unit_value == TimeFrameUnit.Hour:
+            print('Timeframe set to Hour')
+            timeframe = '1h'
+        elif timeframe.unit_value == TimeFrameUnit.Minute:
+            print('Timeframe set to Minute')
+            timeframe = '1m'
+        
         feed = None
 
     delta = end - start
