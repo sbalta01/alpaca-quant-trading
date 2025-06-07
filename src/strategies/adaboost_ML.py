@@ -142,7 +142,7 @@ class AdaBoostStrategy(Strategy):
         feat = remove_outliers(feat, ratio_outliers=self.ratio_outliers)
 
         # 3) Split train / val / test (no shuffle)
-        X = feat.drop(columns=['open','high','low','close','volume','target'])
+        X = feat.drop(columns=['target'])
         y = feat['target']
 
         X_train, X_test, y_train, y_test = train_test_split(
