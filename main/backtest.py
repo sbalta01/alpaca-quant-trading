@@ -98,7 +98,7 @@ if __name__ == "__main__":
     strat = HybridAdaBoostFilterStrategy(
         predictor=predictor,
         atr_window=14,
-        vol_threshold=0.009
+        vol_threshold=0.01
     )
 
     # strat = RegimeSwitchingFactorStrategy( #Usually trained daily for 7 year window
