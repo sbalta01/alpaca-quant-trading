@@ -22,14 +22,14 @@ def plot_returns(results: pd.DataFrame, results_control: pd.DataFrame, title: st
 
     for symbol, grp in results.groupby(level="symbol"):
         grp = grp.droplevel("symbol")
-        ax.plot(grp.index, grp["returns"], label=symbol)
+        ax.plot(grp.index, grp["cum_returns"], label=symbol)
 
-    avg_return_control = results_control['returns'].unstack(level='symbol').mean(axis=1) #Avg returns for all symbols with the control strategy
+    avg_return_control = results_control['cum_returns'].unstack(level='symbol').mean(axis=1) #Avg returns for all symbols with the control strategy
     ax.plot(results_control.index.get_level_values('timestamp').unique(), avg_return_control, label ='Returns control')
 
     ax.legend()
     ax.set_xlabel("Date")
-    ax.set_ylabel("returns")
+    ax.set_ylabel("Cum_returns")
     ax.set_title(title)
     ax.set_xlim(results_control.index.get_level_values('timestamp')[0], results_control.index.get_level_values('timestamp')[-1])
     ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))

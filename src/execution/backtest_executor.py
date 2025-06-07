@@ -96,6 +96,7 @@ def run_backtest_strategy(
         feed = feed
         )
         df_control = df.copy()
+        start_control = start
     num_years = delta.days / 365
     # 2) Initialize and run backtest
     engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock)

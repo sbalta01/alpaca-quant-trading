@@ -33,33 +33,9 @@ class BacktestEngine:
         self.position: float = 0.0  # number of shares held
 
     def _run_single(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Run backtest for ONE symbol (DatetimeIndex).
-        """
-        # Initialize
-        df["position"] = float(0.0)   # share count
-        df["cash"]     = float(self.initial_cash_per_stock)
-        df["returns"]   = float(0.0)
-        cash = float(self.initial_cash_per_stock)
-        position = float(0.0)
-
-        for t in range(1, len(df)):
-            price  = df["close"].iat[t]
-            signal = df["signal"].iat[t]  # +1 buy, -1 sell, 0 hold
-
-            if signal ==  1.0 and position == 0.0:
-                # Buy all‐in
-                position = cash / price
-                cash = 0.0
-            elif signal == -1.0 and position > 0.0:
-                # Sell all‐out
-                cash = position * price
-                position = 0.0
-
-            df.iat[t, df.columns.get_loc("position")] = position
-            df.iat[t, df.columns.get_loc("cash")]     = cash
-            df.iat[t, df.columns.get_loc("returns")]   = (cash + position * price - self.initial_cash_per_stock)/self.initial_cash_per_stock
-
+        df['returns'] = df['close'].pct_change() * df['position'].shift(1).fillna(0.0)
+        df['cum_returns'] = (1 + df['returns']).cumprod() - 1
+        df['equity'] = self.initial_cash_per_stock * (1+ df['cum_returns'])
         return df
 
     def run(self) -> pd.DataFrame:
@@ -96,28 +72,26 @@ class BacktestEngine:
 
     def performance(self, results: pd.DataFrame, num_years) -> Dict[str, float]:
         """Return expanded metrics: Sharpe, Sortino, Calmar, Turnover, Fitness."""
-        results["equity"] = results["position"]*results["close"] + results["cash"]
-        initial_cash = results["cash"].groupby(level="timestamp").sum().iloc[0]
+        initial_cash = self.initial_cash_per_stock*len(results.index.get_level_values("symbol").unique())
         total_equity = results["equity"].groupby(level="timestamp").sum()
         final_equity = total_equity.iloc[-1]
-        total_returns = results['returns'].groupby(level="timestamp").mean() #Mean assumes same cash_per_trade for each asset
-        final_returns = total_returns.iloc[-1] 
+        total_cum_returns = results['cum_returns'].groupby(level="timestamp").mean() #Mean assumes same cash_per_trade for each asset
+        final_cum_returns = total_cum_returns.iloc[-1] 
         profit = final_equity - initial_cash
-        total_returns_cum = total_equity.pct_change().dropna()
 
-        def metrics(total_returns_cum, total_equity): #All metrics are calculated in a Day TimeFrame
+        def metrics(total_cum_returns, total_equity): #All metrics are calculated in a Day TimeFrame
             # Annualization factor
             ann = np.sqrt(252)
-            mean = np.mean(total_returns_cum); std = np.std(total_returns_cum, ddof=1)
+            mean = np.mean(total_cum_returns); std = np.std(total_cum_returns, ddof=1)
             sharpe = (mean/std)*ann if std>0 else np.nan
 
             # Sortino (only downside)
-            neg = total_returns_cum[total_returns_cum<0]
+            neg = total_cum_returns[total_cum_returns<0]
             downside = np.std(neg, ddof=1)
             sortino = (mean/downside)*ann if downside>0 else np.nan
 
             # Max drawdown
-            cum = np.cumprod(1+total_returns_cum)
+            cum = np.cumprod(1+total_cum_returns)
             peak = np.maximum.accumulate(cum)
             max_drawdown = np.min(cum/peak -1)
             # max_drawdown = (((total_returns+1) / (total_returns+1).cummax()) - 1).min() ##Equivalent
@@ -159,9 +133,9 @@ class BacktestEngine:
             except:
                 ML_metrics = {'No ML algorithm': ['','']}
 
-            return initial_cash, final_equity, profit, max_drawdown, cagr, final_returns, sharpe, sortino, calmar, to, fitness, ML_metrics
+            return initial_cash, final_equity, profit, max_drawdown, cagr, final_cum_returns, sharpe, sortino, calmar, to, fitness, ML_metrics
 
-        agg = metrics(total_returns_cum,total_equity)
+        agg = metrics(total_cum_returns,total_equity)
         out = dict(zip(
             ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness', 'ML metrics'],
             agg
