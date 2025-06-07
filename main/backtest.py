@@ -6,13 +6,16 @@ import pandas as pd
 
 from src.data.data_loader import fetch_nasdaq_100_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
+from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_returns, plot_signals
 
 import time
 
+from src.strategies.moving_average import MovingAverageStrategy
 from src.strategies.pair_trading import CointegrationPairTradingStrategy
+from src.strategies.penalized_regression import PenalizedRegressionStrategy
 
 
 if __name__ == "__main__":
@@ -20,8 +23,9 @@ if __name__ == "__main__":
     # symbols = ["USO"]
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
-    symbols = ["AAPL","MSFT"]
+    # symbols = ["AAPL","MSFT"]
     # symbols = ["HAG.DE"]
+    symbols = ["NDX"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].to_list()
@@ -34,12 +38,14 @@ if __name__ == "__main__":
     # symbols = fetch_nasdaq_100_symbols()
 
     # start   = datetime(2016, 1, 1)
-    start   = datetime(2022, 1, 1)
+    start   = datetime(2015, 1, 1)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    # strat = MovingAverageStrategy(short_window=9, long_window=20, angle_threshold_deg = 45.0, ma = 'ema')
+    # strat = MovingAverageStrategy(short_window=9, long_window=20, angle_threshold_deg = 15.0, ma = 'ema',
+    #  atr_window = 14, vol_threshold = 0.01)
+
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
     # strat = RollingWindowStrategy(
@@ -78,25 +84,22 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    # predictor = AdaBoostStrategy(
-    #     d=10,
-    #     train_frac=0.7,
-    #     cv_splits=5,
-    #     param_grid={
-    #         'clf__n_estimators': [50,100,200],
-    #         'clf__learning_rate': [0.1,0.5,1.0]
-    #     },
-    #     # ratio_outliers = 3.00,
-    #     n_iter_search = 50
-    # )
-    # strat = HybridAdaBoostFilterStrategy(
-    #     predictor=predictor,
-    #     short_ma=9,
-    #     long_ma=20,
-    #     angle_threshold_deg=10,
-    #     atr_window=14,
-    #     vol_threshold=0.01
-    # )
+    predictor = AdaBoostStrategy(
+        d=10,
+        train_frac=0.7,
+        cv_splits=5,
+        param_grid={
+            'clf__n_estimators': [50,100,200],
+            'clf__learning_rate': [0.1,0.5,1.0]
+        },
+        # ratio_outliers = 3.00,
+        n_iter_search = 50
+    )
+    strat = HybridAdaBoostFilterStrategy(
+        predictor=predictor,
+        atr_window=14,
+        vol_threshold=0.009
+    )
 
     # strat = RegimeSwitchingFactorStrategy( #Usually trained daily for 7 year window
     #     regime_symbol = "HAG.DE",
@@ -107,17 +110,17 @@ if __name__ == "__main__":
     #     random_state = 42
     # )
 
-    strat = AdaBoostStrategy(
-            d=10,
-            train_frac=0.7,
-            cv_splits=5,
-            param_grid={
-                'clf__n_estimators': [50,100,200],
-                'clf__learning_rate': [0.1,0.5,1.0]
-            },
-            # ratio_outliers = 3.00,
-            n_iter_search = 50,
-        )
+    # strat = AdaBoostStrategy(
+    #         d=10,
+    #         train_frac=0.7,
+    #         cv_splits=5,
+    #         param_grid={
+    #             'clf__n_estimators': [50,100,200],
+    #             'clf__learning_rate': [0.1,0.5,1.0]
+    #         },
+    #         # ratio_outliers = 3.00,
+    #         n_iter_search = 50,
+    #     )
 
     # strat = CointegrationPairTradingStrategy(
     #     corr_threshold = 0.8,
@@ -125,6 +128,18 @@ if __name__ == "__main__":
     #     lookback=20,
     #     z_entry=2.0,
     #     z_exit=0.5
+    # )
+
+    # strat = PenalizedRegressionStrategy(
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     rfecv_step= 0.1,
+    #     param_grid = {
+    #         'reg__alpha':   [1e-3, 1e-2, 1e-1, 1.0, 10.0],
+    #         'reg__l1_ratio':[0.1, 0.5, 0.9]
+    #     },
+    #     # ratio_outliers = np.inf,
+    #     n_iter_search = 50
     # )
 
     start_backtest = time.perf_counter()
@@ -135,7 +150,6 @@ if __name__ == "__main__":
         start=start,
         end=end,
         timeframe=timeframe,
-        # timeframe="1d",
         initial_cash_per_stock=10_000,
         # feed = 'iex'
     )
