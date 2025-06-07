@@ -12,15 +12,15 @@ from src.backtesting.visualizer import plot_returns, plot_signals
 
 import time
 
-from src.strategies.pair_trading import PairTradingStrategy
+from src.strategies.pair_trading import CointegrationPairTradingStrategy
 
 
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["AAPL","AMZN","MSFT","GOOG"]
-    symbols = ["AAPL","MSFT"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    # symbols = ["AAPL","MSFT"]
     # symbols = ["HAG.DE"]
 
     # fetch_sp500_symbols()
@@ -31,10 +31,10 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    # symbols = fetch_nasdaq_100_symbols()
+    symbols = fetch_nasdaq_100_symbols()
 
     # start   = datetime(2016, 1, 1)
-    start   = datetime(2022, 1, 1)
+    start   = datetime(2023, 1, 1)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -107,24 +107,25 @@ if __name__ == "__main__":
     #     random_state = 42
     # )
 
-    strat = AdaBoostStrategy(
-            d=10,
-            train_frac=0.7,
-            cv_splits=5,
-            param_grid={
-                'clf__n_estimators': [50,100,200],
-                'clf__learning_rate': [0.1,0.5,1.0]
-            },
-            # ratio_outliers = 3.00,
-            n_iter_search = 50,
-        )
+    # strat = AdaBoostStrategy(
+    #         d=10,
+    #         train_frac=0.7,
+    #         cv_splits=5,
+    #         param_grid={
+    #             'clf__n_estimators': [50,100,200],
+    #             'clf__learning_rate': [0.1,0.5,1.0]
+    #         },
+    #         # ratio_outliers = 3.00,
+    #         n_iter_search = 50,
+    #     )
 
-    # strat = PairTradingStrategy(
-    #     pair=("AAPL","MSFT"),
-    #     lookback=20,
-    #     z_entry=2.0,
-    #     z_exit=0.5
-    # )
+    strat = CointegrationPairTradingStrategy(
+        corr_threshold = 0.8,
+        pvalue_threshold = 0.05,
+        lookback=20,
+        z_entry=2.0,
+        z_exit=0.5
+    )
 
     start_backtest = time.perf_counter()
 
