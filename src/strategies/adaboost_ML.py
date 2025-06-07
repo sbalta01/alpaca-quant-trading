@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import sma, ema, rsi
+from src.utils.indicators import remove_outliers, sma, ema, rsi
 
 class AdaBoostStrategy(Strategy):
     """
@@ -29,7 +29,7 @@ class AdaBoostStrategy(Strategy):
         cv_splits: int = 5,
         param_grid: Dict[str, Any] = None,
         random_state: int = 42,
-        ratio_outliers:float = np.inf,
+        ratio_outliers: float = np.inf,
         n_iter_search: int = 50
     ):
         """
@@ -71,20 +71,6 @@ class AdaBoostStrategy(Strategy):
             )),
             ('clf', AdaBoostClassifier(random_state=self.random_state))
         ])
-
-    def _remove_outliers(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Drop rows where any feature is outside ratio*IQR."""
-        if self.ratio_outliers == np.inf:
-            return df
-        else:
-            clean = df.copy()
-            for col in df.columns:
-                q1 = clean[col].quantile(0.25)
-                q3 = clean[col].quantile(0.75)
-                iqr = q3 - q1
-                lo, hi = q1 - self.ratio_outliers * iqr, q3 + self.ratio_outliers * iqr
-                clean = clean[(clean[col] >= lo) & (clean[col] <= hi)]
-            return clean
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute the 32 features from your table."""
@@ -153,7 +139,7 @@ class AdaBoostStrategy(Strategy):
         feat['target'] = feat['target'].astype(int)
 
         # 2) Remove outliers
-        feat = self._remove_outliers(feat)
+        feat = remove_outliers(feat, ratio_outliers=self.ratio_outliers)
 
         # 3) Split train / val / test (no shuffle)
         X = feat.drop(columns=['open','high','low','close','volume','target'])
