@@ -43,3 +43,14 @@ def remove_outliers(df: pd.DataFrame, ratio_outliers: float = np.inf) -> pd.Data
             lo, hi = q1 - ratio_outliers * iqr, q3 + ratio_outliers * iqr
             clean = clean[(clean[col] >= lo) & (clean[col] <= hi)]
         return clean
+
+@staticmethod
+def atr(df: pd.DataFrame, window: int) -> pd.Series:
+    """Average True Range over `window`."""
+    high, low, close = df["high"], df["low"], df["close"]
+    prev_close = close.shift(1)
+    tr1 = high - low
+    tr2 = (high - prev_close).abs()
+    tr3 = (low  - prev_close).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    return tr.rolling(window).mean()
