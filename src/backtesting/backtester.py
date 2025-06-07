@@ -40,7 +40,7 @@ class BacktestEngine:
 
     def run(self) -> pd.DataFrame:
         """
-        If self.data is multi‐symbol (MultiIndex), run each symbol separately
+        If self.data is multi-symbol (MultiIndex), run each symbol separately
         and concatenate the results with a MultiIndex. Otherwise, run single.
         """
         df = self.data
