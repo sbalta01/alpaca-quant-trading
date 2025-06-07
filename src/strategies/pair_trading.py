@@ -118,6 +118,6 @@ class CointegrationPairTradingStrategy(Strategy):
         pos_flat = all_pos.stack()                # Series indexed (timestamp, symbol)
         pos_flat.index.names = ["timestamp","symbol"]
         pos_flat = pos_flat.swaplevel()           # now (symbol, timestamp)
-        out["position"] = pos_flat.reindex(out.index).fillna(0.0) #No short selling by clipping
+        out["position"] = pos_flat.reindex(out.index).fillna(0.0).clip(0,1) #No short selling by clipping
         out["signal"] = out.groupby(level="symbol")["position"].diff().fillna(0.0)
         return out
