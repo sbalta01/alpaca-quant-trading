@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any
 
+from sklearn.metrics import r2_score
 from sklearn.linear_model import ElasticNet
 from sklearn.feature_selection import RFECV
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, TimeSeriesSplit, train_test_split
@@ -54,13 +55,13 @@ class PenalizedRegressionStrategy(Strategy):
         inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            ('rfecv', RFECV(
-                estimator=ElasticNet(random_state=self.random_state, max_iter=5000),
-                step=self.rfecv_step,
-                cv=inner_cv,
-                scoring='neg_mean_squared_error',
-                n_jobs=-1
-            )),
+            # ('rfecv', RFECV(
+            #     estimator=ElasticNet(random_state=self.random_state, max_iter=5000),
+            #     step=self.rfecv_step,
+            #     cv=inner_cv,
+            #     scoring='neg_mean_squared_error',
+            #     n_jobs=-1
+            # )),
             ('reg', ElasticNet(random_state=self.random_state, max_iter=5000))
         ])
 
@@ -114,7 +115,7 @@ class PenalizedRegressionStrategy(Strategy):
                 param_distributions=self.param_grid,
                 n_iter=self.n_iter_search,
                 cv=outer_cv,
-                scoring='accuracy',
+                scoring='neg_mean_squared_error',
                 random_state=self.random_state,
                 n_jobs=-1
             )
@@ -124,7 +125,7 @@ class PenalizedRegressionStrategy(Strategy):
                 estimator=self.pipeline,
                 param_grid=self.param_grid,
                 cv=outer_cv,
-                scoring='accuracy',
+                scoring='neg_mean_squared_error',
                 n_jobs=-1
             )
             print('Grid Search CV')
@@ -132,29 +133,46 @@ class PenalizedRegressionStrategy(Strategy):
         gs.fit(X_train, y_train)
         best = gs.best_estimator_
 
-        # train_acc = gs.score(X_train, y_train)
-        # test_acc  = gs.score(X_test,  y_test)
-        # print(f"Train acc: {train_acc:.3f}, Test acc: {test_acc:.3f}")
-
         # 4) Predict on test set
         y_pred = best.predict(X_test)
 
+        r2_train = r2_score(y_train, best.predict(X_train))
+        r2_test = r2_score(y_test, y_pred)
+        print(f"Train R2 Score: {r2_train:.3f}, Test R2 Score: {r2_test:.3f}")
+        
+        # 2) Directional accuracy: how often sign(pred) == sign(true)
+        sign_test = np.sign(y_test)
+        sign_pred = np.sign(y_pred)
+        dir_acc = (sign_test == sign_pred).mean()
+
+        print(f"Average directional accuracy (Test set): {dir_acc:.3f}")
+
         # 5) Build a stateful signal series
         #   +1 = enter long, -1 = enter short, 0 = hold
-        sig = pd.Series(0.0, index=feat.index)
+        positions = pd.Series(0.0, index=feat.index)
+        y_test_series = pd.Series(0.0, index=feat.index)
+        test_mask = pd.Series(0.0, index=feat.index)
+        idxs = list(X_test.index)
         position = 0
-        for t in X_test.index:
-            pred = y_pred.loc[t]
+        for idx, pred, y in zip(idxs, y_pred, y_test):
             if position == 0:
                 # long if pred > 0, short if pred < 0
-                position = 1 if pred > 0 else -1
-                sig.at[t] = position
-            else:
-                # exit to flat when prediction changes sign or is near zero
-                if (position == 1 and pred <= 0) or (position == -1 and pred >= 0):
-                    sig.at[t] = -position  # flip back to zero state
-                    position = 0
+                position = 1 if pred > 0 else 0
+            elif (position == 1 and pred <= 0) or (position == -1 and pred >= 0):
+                position = 0
+            positions.at[idx] = position
+
+            # positions.at[idx] = pred
+            # y_test_series.at[idx] = y
+            # test_mask.at[idx] = 1.0
 
         # 6) Merge signals back into full df
-        df['signal'] = sig.reindex(df.index).fillna(0.0).astype(int)
-        return df
+        out = df.copy()
+        out["position"] = positions.reindex(df.index).fillna(0.0)
+        out['signal'] = out['position'].diff().fillna(0.0)
+        
+        out["y_test"] = y_test_series.reindex(df.index).fillna(0.0)
+        out["y_pred"] = out["position"].copy()
+        out["test_mask"] = test_mask.reindex(df.index).fillna(0.0)
+
+        return out

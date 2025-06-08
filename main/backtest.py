@@ -114,8 +114,10 @@ if __name__ == "__main__":
         cv_splits=5,
         rfecv_step= 0.1,
         param_grid = {
-            'reg__alpha':   [1e-3, 1e-2, 1e-1, 1.0, 10.0],
-            'reg__l1_ratio':[0.1, 0.5, 0.9]
+            # 'reg__alpha':   [1e-3, 1e-2, 1e-1, 1.0, 10.0],
+            'reg__alpha':   [0.0],
+            # 'reg__l1_ratio':[0.1, 0.5, 0.9]
+            'reg__l1_ratio':[0.5]
         },
         # ratio_outliers = 1.75,
         n_iter_search = 50
