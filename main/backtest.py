@@ -21,11 +21,11 @@ from src.strategies.penalized_regression import PenalizedRegressionStrategy
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    # symbols = ["SPY"]
+    symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["HAG.DE"]
-    symbols = ["NDX"]
+    # symbols = ["NDX"]
 
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].to_list()
@@ -41,10 +41,9 @@ if __name__ == "__main__":
     start   = datetime(2015, 1, 1)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
-    timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
-
-    # strat = MovingAverageStrategy(short_window=9, long_window=20, angle_threshold_deg = 15.0, ma = 'ema',
-    #  atr_window = 14, vol_threshold = 0.01)
+    timeframe = TimeFrame.Week  # or pd.Timedelta(days=1)
+    strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
+                                atr_window = 14, vol_threshold = 0.03) #Seems best in week timeframes
 
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
@@ -84,22 +83,22 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    predictor = AdaBoostStrategy(
-        d=10,
-        train_frac=0.7,
-        cv_splits=5,
-        param_grid={
-            'clf__n_estimators': [50,100,200],
-            'clf__learning_rate': [0.1,0.5,1.0]
-        },
-        # ratio_outliers = 3.00,
-        n_iter_search = 50
-    )
-    strat = HybridAdaBoostFilterStrategy(
-        predictor=predictor,
-        atr_window=14,
-        vol_threshold=0.01
-    )
+    # predictor = AdaBoostStrategy(
+    #     d=10,
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     param_grid={
+    #         'clf__n_estimators': [50,100,200],
+    #         'clf__learning_rate': [0.1,0.5,1.0]
+    #     },
+    #     # ratio_outliers = 3.00,
+    #     n_iter_search = 50
+    # )
+    # strat = HybridAdaBoostFilterStrategy(
+    #     predictor=predictor,
+    #     atr_window=14,
+    #     vol_threshold=0.01
+    # )
 
     # strat = RegimeSwitchingFactorStrategy( #Usually trained daily for 7 year window
     #     regime_symbol = "HAG.DE",
@@ -138,7 +137,7 @@ if __name__ == "__main__":
     #         'reg__alpha':   [1e-3, 1e-2, 1e-1, 1.0, 10.0],
     #         'reg__l1_ratio':[0.1, 0.5, 0.9]
     #     },
-    #     # ratio_outliers = np.inf,
+    #     # ratio_outliers = 1.75,
     #     n_iter_search = 50
     # )
 

@@ -13,7 +13,7 @@ class BacktestEngine:
       - Takes a Strategy instance and historical price data (DataFrame).
       - Calls strategy.generate_signals(data) to get 'signal' & (new) 'position' columns.
       - Simulates P&L over time assuming:
-          * Full allocation on each trade (all‐in / all‐out)
+          * Full allocation on each trade (all-in / all-out)
           * Zero transaction costs
           * No leverage
       - Computes basic performance metrics.
@@ -33,8 +33,8 @@ class BacktestEngine:
         self.position: float = 0.0  # number of shares held
 
     def _run_single(self, df: pd.DataFrame) -> pd.DataFrame:
-        df['returns'] = df['close'].pct_change() * df['position'].shift(1).fillna(0.0)
-        df['cum_returns'] = (1 + df['returns']).cumprod() - 1
+        df['returns'] = (df['close'].pct_change() * df['position'].shift(1)).fillna(0.0)
+        df['cum_returns'] = ((1 + df['returns']).cumprod() - 1).fillna(0.0)
         df['equity'] = self.initial_cash_per_stock * (1+ df['cum_returns'])
         return df
 
@@ -64,7 +64,7 @@ class BacktestEngine:
                 out["symbol"] = symbol
                 results.append(out)
 
-        # concat and re‐set MultiIndex(symbol, timestamp)
+        # concat and re-set MultiIndex(symbol, timestamp)
         final = pd.concat(results)
         final = final.set_index("symbol", append=True)
         final = final.reorder_levels(["symbol", final.index.names[0]])
@@ -75,23 +75,24 @@ class BacktestEngine:
         initial_cash = self.initial_cash_per_stock*len(results.index.get_level_values("symbol").unique())
         total_equity = results["equity"].groupby(level="timestamp").sum()
         final_equity = total_equity.iloc[-1]
+        total_returns = results['returns'].groupby(level="timestamp").mean()
         total_cum_returns = results['cum_returns'].groupby(level="timestamp").mean() #Mean assumes same cash_per_trade for each asset
         final_cum_returns = total_cum_returns.iloc[-1] 
         profit = final_equity - initial_cash
 
-        def metrics(total_cum_returns, total_equity): #All metrics are calculated in a Day TimeFrame
+        def metrics(total_returns, total_equity): #All metrics are calculated in a Day TimeFrame
             # Annualization factor
             ann = np.sqrt(252)
-            mean = np.mean(total_cum_returns); std = np.std(total_cum_returns, ddof=1)
+            mean = np.mean(total_returns); std = np.std(total_returns, ddof=1)
             sharpe = (mean/std)*ann if std>0 else np.nan
 
             # Sortino (only downside)
-            neg = total_cum_returns[total_cum_returns<0]
+            neg = total_returns[total_returns<0]
             downside = np.std(neg, ddof=1)
             sortino = (mean/downside)*ann if downside>0 else np.nan
 
             # Max drawdown
-            cum = np.cumprod(1+total_cum_returns)
+            cum = np.cumprod(1+total_returns)
             peak = np.maximum.accumulate(cum)
             max_drawdown = np.min(cum/peak -1)
             # max_drawdown = (((total_returns+1) / (total_returns+1).cummax()) - 1).min() ##Equivalent
@@ -135,7 +136,7 @@ class BacktestEngine:
 
             return initial_cash, final_equity, profit, max_drawdown, cagr, final_cum_returns, sharpe, sortino, calmar, to, fitness, ML_metrics
 
-        agg = metrics(total_cum_returns,total_equity)
+        agg = metrics(total_returns,total_equity)
         out = dict(zip(
             ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness', 'ML metrics'],
             agg
