@@ -43,6 +43,7 @@ def plot_signals(
     results_control: pd.DataFrame,
     price_col: str = "close",
     signal_col: str = "signal",
+    position_col: str = "position",
     title: str = "Price & Signals"
 ) -> None:
     """
@@ -71,10 +72,17 @@ def plot_signals(
             ax.plot(df.index, df["ma_long"], '--', label="Long MA")
         except:
             pass
-        buys  = df[df[signal_col] ==  1.0]
-        sells = df[df[signal_col] == -1.0]
-        ax.scatter(buys.index,  buys[price_col], marker="^", color = "olive", label=f"{label} Buy" if label else "Buy",  s=50)
-        ax.scatter(sells.index, sells[price_col], marker="v", color = "darkslategrey",label=f"{label} Sell" if label else "Sell", s=50)
+        long  = df[df[signal_col] ==  1.0]
+        long  = long[long[position_col] ==  1.0]
+        flat = df[df[position_col] ==  0.0]
+        flat_1 = flat[flat[signal_col] == -1.0]
+        flat_2 = flat[flat[signal_col] == 1.0]
+        short = df[df[signal_col] == -1.0]
+        short = short[short[position_col] ==  -1.0]
+        ax.scatter(long.index,  long[price_col], marker="^", color = "olive", label=f"{label} Long" if label else "Long",  s=50)
+        ax.scatter(short.index, short[price_col], marker="v", color = "darkslategrey",label=f"{label} Short" if label else "Short", s=50)
+        ax.scatter(flat_1.index, flat_1[price_col], marker="o", color = "darkslategrey",label=f"{label} Flat" if label else "Flat", s=50)
+        ax.scatter(flat_2.index, flat_2[price_col], marker="o", color = "darkslategrey",label=f"{label} Flat" if label else "Flat", s=50)
 
     for symbol, grp in results.groupby(level="symbol"):
         single = grp.droplevel("symbol")
