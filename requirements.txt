@@ -7,3 +7,4 @@ python-dotenv
 yfinance
 lxml
 statsmodels
+xgboost

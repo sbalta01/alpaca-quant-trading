@@ -154,17 +154,17 @@ class PenalizedRegressionStrategy(Strategy):
         test_mask = pd.Series(0.0, index=feat.index)
         idxs = list(X_test.index)
         position = 0
-        for idx, pred, y in zip(idxs, y_pred, y_test):
+        for t, pred, y in zip(idxs, y_pred, y_test):
             if position == 0:
                 # long if pred > 0, short if pred < 0
                 position = 1 if pred > 0 else 0
             elif (position == 1 and pred <= 0) or (position == -1 and pred >= 0):
                 position = 0
-            positions.at[idx] = position
+            positions.at[t] = position
 
-            # positions.at[idx] = pred
-            # y_test_series.at[idx] = y
-            # test_mask.at[idx] = 1.0
+            # positions.at[t] = pred
+            # y_test_series.at[t] = y
+            # test_mask.at[t] = 1.0
 
         # 6) Merge signals back into full df
         out = df.copy()

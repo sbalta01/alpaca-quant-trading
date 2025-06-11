@@ -16,15 +16,16 @@ import time
 from src.strategies.moving_average import MovingAverageStrategy
 from src.strategies.pair_trading import CointegrationPairTradingStrategy
 from src.strategies.penalized_regression_ML import PenalizedRegressionStrategy
+from src.strategies.xgboost_regression_ML import XGBoostRegressionStrategy
 
 
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    # symbols = ["SPY"]
+    symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["AAPL","MSFT"]
-    symbols = ["HAG.DE"]
+    # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
     # symbols = ["HAG.DE","RHM.DE"]
     # symbols = ["NVDA"]
@@ -46,8 +47,8 @@ if __name__ == "__main__":
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
-                                atr_window = 14, vol_threshold = 0.04)
+    # strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
+    #                             atr_window = 14, vol_threshold = 0.04)
 
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
@@ -123,6 +124,20 @@ if __name__ == "__main__":
     #     # ratio_outliers = 1.75,
     #     n_iter_search = 50
     # )
+
+    strat = XGBoostRegressionStrategy(
+        train_frac = 0.7,
+        cv_splits = 5,
+        rfecv_step = 0.1,
+        param_grid = {
+            'model__n_estimators': [50, 100, 200],
+            'model__max_depth':    [3, 5, 7],
+            'model__learning_rate': [0.01, 0.1, 0.2],
+            'model__subsample':    [0.7, 1.0],
+        },
+        # ratio_outliers: float = 1.75,
+        n_iter_search = 50
+    )
 
     start_backtest = time.perf_counter()
 
