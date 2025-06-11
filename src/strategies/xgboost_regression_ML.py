@@ -15,7 +15,7 @@ from sklearn.metrics import r2_score
 from xgboost import XGBRegressor
 
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import ema, rsi, sma
+from src.utils.indicators import ema, remove_outliers, rsi, sma
 
 class XGBoostRegressionStrategy(Strategy):
     """
@@ -34,6 +34,7 @@ class XGBoostRegressionStrategy(Strategy):
         cv_splits: int = 5,
         rfecv_step: float = 0.1,
         param_grid: Dict[str, Any] = None,
+        signal_thresh: float = 0.002, #Minimum daily return to trade
         random_state: int = 42,
         ratio_outliers: float = np.inf,
         n_iter_search: int = 50
@@ -47,13 +48,14 @@ class XGBoostRegressionStrategy(Strategy):
         self.random_state = random_state
         self.ratio_outliers = ratio_outliers
         self.n_iter_search = n_iter_search
+        self.signal_thresh = np.log(signal_thresh + 1) #Consistent with log-target
 
         # default hyperparameter grid for XGB
         self.param_grid = param_grid or {
             'model__n_estimators': randint(50, 500),
             'model__max_depth': randint(1, 10),
             'model__learning_rate': uniform(0.01, 2.0),
-            'model__subsample': uniform(0.5, 1.0)
+            'model__subsample': uniform(0.5, 1.0),
         }
 
         # Build pipeline:
@@ -68,13 +70,13 @@ class XGBoostRegressionStrategy(Strategy):
         )
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            ('rfecv', RFECV(
-                estimator=base,
-                step=self.rfecv_step,
-                cv=inner_cv,
-                scoring='r2',
-                n_jobs=-1
-            )),
+            # ('rfecv', RFECV(
+            #     estimator=base,
+            #     step=self.rfecv_step,
+            #     cv=inner_cv,
+            #     scoring='r2',
+            #     n_jobs=-1
+            # )),
             ('model', base)
         ])
 
@@ -162,8 +164,11 @@ class XGBoostRegressionStrategy(Strategy):
 
         # 1) Compute features + target (next-bar return)
         feat = self._compute_features(df)
-        feat['target'] = np.log(feat['close']).shift(-1) - np.log(feat['close'])
+        # feat['target'] = np.log(feat['close']).shift(-1) - np.log(feat['close'])
+        feat['target'] = np.log(feat['close'].shift(-1)/feat['close'])
         feat = feat.dropna()
+        
+        feat = remove_outliers(feat, ratio_outliers=self.ratio_outliers)
 
         # # 2) Merge in factor variables (assumed present in df)
         # factors = ['EPR','BMR','EBITDA','EPS','PE','earnings_growth',
@@ -217,7 +222,7 @@ class XGBoostRegressionStrategy(Strategy):
         r2_test = r2_score(y_test, y_pred)
         print(f"[{self.name}] R² score.\nTrain: {r2_train:.3f}. Test: {r2_test:.3f}")
         
-        # 2) Directional accuracy: how often sign(pred) == sign(true)
+        # Directional accuracy: how often sign(pred) == sign(true)
         sign_test = np.sign(y_test)
         sign_pred = np.sign(y_pred)
         dir_acc = (sign_test == sign_pred).mean()
@@ -231,25 +236,24 @@ class XGBoostRegressionStrategy(Strategy):
         test_mask = pd.Series(0.0, index=feat.index)
         idxs = list(X_test.index)
         position = 0
-        for t, pred, y in zip(idxs, y_pred, y_test):
+        for t, pred, test in zip(idxs, y_pred, y_test):
             if position == 0:
-                if pred > 0:
+                if pred > self.signal_thresh:
                     position = 1
-                elif pred < 0:
+                elif pred < self.signal_thresh:
                     position = -1
-            else:
-                # exit to flat on sign change
-                if (position==1 and pred <= 0) or (position==-1 and pred>=0):
-                    position = 0
+            elif (position==1 and pred <= 0) or (position==-1 and pred>=0):
+                position = 0 # exit to flat on sign change
+            
             positions.at[t] = position
             y_pred_series.at[t] = pred
-            y_test_series.at[t] = y
+            y_test_series.at[t] = test
             test_mask.at[t] = 1.0
 
         # 7) Merge signals into df
         out = df.copy()
-        out["position"] = positions.reindex(df.index).fillna(0.0)
-        out['signal'] = out['position'].diff().fillna(0.0)
+        out["position"] = positions.reindex(df.index).fillna(0.0).clip(0,1) #clip(0,1) for no short
+        out['signal'] = out['position'].diff().fillna(0.0).clip(-1,1)
         
         out["y_test"] = y_test_series.reindex(df.index).fillna(0.0)
         out["y_pred"] = y_pred_series.reindex(df.index).fillna(0.0)
