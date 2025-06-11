@@ -141,7 +141,7 @@ def run_backtest_strategy(
         pass
 
     print(f"\n--- Backtest: {strategy.name} on {symbols} ---")
-    print(f"Period       : {start_control.date()} → {end.date()}")
+    print(f"Period       : {start_control} → {end}")
     print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
     print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
     print(f"Profit       : {perf['Profit']:.2f}  |  Benchmark: {perf_ctrl['Profit']:.2f}")

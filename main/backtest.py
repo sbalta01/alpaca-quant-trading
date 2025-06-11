@@ -24,9 +24,10 @@ if __name__ == "__main__":
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["AAPL","MSFT"]
-    # symbols = ["HAG.DE"]
+    symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
-    symbols = ["NVDA"]
+    # symbols = ["HAG.DE","RHM.DE"]
+    # symbols = ["NVDA"]
     # symbols = ["NDX"]
 
     # fetch_sp500_symbols()
@@ -40,13 +41,13 @@ if __name__ == "__main__":
     # symbols = fetch_nasdaq_100_symbols()
 
     # start   = datetime(2016, 1, 1)
-    start   = datetime(2020, 1, 1)
+    start   = datetime(2020, 10, 12)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
-    # strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
-    #                             atr_window = 14, vol_threshold = 0.03)
+    strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
+                                atr_window = 14, vol_threshold = 0.04)
 
     # strat = BollingerMeanReversionStrategy(window=20, k=2,)
     # strat = RandomForestStrategy(train_frac=0.7, n_estimators=100)
@@ -109,19 +110,19 @@ if __name__ == "__main__":
     #     z_exit=0.5
     # )
 
-    strat = PenalizedRegressionStrategy(
-        train_frac=0.7,
-        cv_splits=5,
-        rfecv_step= 0.1,
-        param_grid = {
-            # 'reg__alpha':   [1e-3, 1e-2, 1e-1, 1.0, 10.0],
-            'reg__alpha':   [0.0],
-            # 'reg__l1_ratio':[0.1, 0.5, 0.9]
-            'reg__l1_ratio':[0.5]
-        },
-        # ratio_outliers = 1.75,
-        n_iter_search = 50
-    )
+    # strat = PenalizedRegressionStrategy(
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     rfecv_step= 0.1,
+    #     param_grid = {
+    #         # 'reg__alpha':   [1e-3, 1e-2, 1e-1, 1.0, 10.0],
+    #         'reg__alpha':   [0.0],
+    #         # 'reg__l1_ratio':[0.1, 0.5, 0.9]
+    #         'reg__l1_ratio':[0.5]
+    #     },
+    #     # ratio_outliers = 1.75,
+    #     n_iter_search = 50
+    # )
 
     start_backtest = time.perf_counter()
 
