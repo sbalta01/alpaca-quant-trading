@@ -15,7 +15,7 @@ import time
 
 from src.strategies.moving_average import MovingAverageStrategy
 from src.strategies.pair_trading import CointegrationPairTradingStrategy
-from src.strategies.penalized_regression import PenalizedRegressionStrategy
+from src.strategies.penalized_regression_ML import PenalizedRegressionStrategy
 
 
 if __name__ == "__main__":
