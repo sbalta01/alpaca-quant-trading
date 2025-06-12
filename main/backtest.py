@@ -22,13 +22,13 @@ from src.strategies.xgboost_regression_ML import XGBoostRegressionStrategy
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    symbols = ["SPY"]
+    # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
     # symbols = ["HAG.DE","RHM.DE"]
-    # symbols = ["NVDA"]
+    symbols = ["NVDA"]
     # symbols = ["NDX"]
 
     # fetch_sp500_symbols()
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # symbols = fetch_nasdaq_100_symbols()
 
     start   = datetime(2020, 1, 1)
-    # start   = datetime(2025, 2, 5)
+    # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -126,17 +126,17 @@ if __name__ == "__main__":
     # )
 
     strat = XGBoostRegressionStrategy(
+        horizon = 10,
         train_frac = 0.7,
         cv_splits = 5,
         rfecv_step = 0.1,
-        param_grid = {
-            'model__n_estimators': [50, 100, 200],
-            'model__max_depth':    [3, 5, 7],
-            'model__learning_rate': [0.01, 0.1, 0.2],
-            'model__subsample':    [0.7, 1.0],
-        },
-        signal_thresh = 0.002,
-        # ratio_outliers: float = 1.75,
+        # param_grid = {
+        #     'model__n_estimators': [50, 100, 200],
+        #     'model__max_depth':    [3, 5, 7],
+        #     'model__learning_rate': [0.01, 0.1, 0.2],
+        #     'model__subsample':    [0.7, 1.0],
+        # },
+        signal_thresh = 0.005,
         n_iter_search = 50
     )
 
