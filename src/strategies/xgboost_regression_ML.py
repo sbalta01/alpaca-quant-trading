@@ -86,8 +86,7 @@ class XGBoostRegressionStrategy(Strategy):
         Compute technical & Ichimoku features from price DataFrame.
         Expects df has columns: ['open','high','low','close','volume'].
         """
-        self.symbol = df.index[0][0]
-        df = df.droplevel("symbol").copy()
+        df = df.copy()
 
         # --- Price & lag features ---
         df['open'] = df['open']
@@ -171,6 +170,8 @@ class XGBoostRegressionStrategy(Strategy):
         feat = self._compute_features(df)
         feat['target'] = np.log(feat['close'].shift(-self.horizon)/feat['close'])
         feat = feat.dropna()
+
+        
         
         # # 2) Merge in factor variables (assumed present in df)
         # factors = ['EPR','BMR','EBITDA','EPS','PE','earnings_growth',

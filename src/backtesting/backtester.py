@@ -57,8 +57,8 @@ class BacktestEngine:
         else:
             results = []
             for symbol, subdf in df.groupby(level="symbol"):
-                # single = subdf.droplevel("symbol")
-                single = self.strategy.generate_signals(subdf).copy() ##Generate signals one by one
+                single = subdf.droplevel("symbol")
+                single = self.strategy.generate_signals(single).copy() ##Generate signals one by one
                 out = self._run_single(single)
                 # Reattach symbol level
                 out["symbol"] = symbol
