@@ -41,8 +41,8 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2020, 1, 1)
-    # start   = datetime(2025, 1, 5)
+    # start   = datetime(2015, 1, 1)
+    start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
