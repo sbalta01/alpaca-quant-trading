@@ -174,3 +174,22 @@ def fetch_yahoo_data(
 
     out = pd.concat(data_frames).sort_index()
     return out
+
+def fetch_yahoo_fundamentals(symbols: List[str]) -> pd.DataFrame:
+    """
+    Returns a DataFrame indexed by symbol with columns like:
+      ['trailingPE','forwardPE','priceToBook','earningsQuarterlyGrowth','ebitda','earningsDate']
+    """
+    data = {}
+    for sym in symbols:
+        tkr = yf.Ticker(sym)
+        info = tkr.info
+        data[sym] = {
+            'PE': info.get('trailingPE'),
+            'forwardPE': info.get('forwardPE'),
+            'PB': info.get('priceToBook'),
+            'EPS': info.get('trailingEps'),
+            'EBITDA': info.get('ebitda'),
+            'earningsGrowth': info.get('earningsQuarterlyGrowth')
+        }
+    return pd.DataFrame.from_dict(data, orient='index')
