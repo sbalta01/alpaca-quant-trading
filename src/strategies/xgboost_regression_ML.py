@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any
 
+from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import (
@@ -13,6 +14,7 @@ from sklearn.model_selection import (
 from sklearn.feature_selection import RFECV
 from sklearn.metrics import r2_score
 from xgboost import XGBRegressor
+from src.utils.metrics import sharpe_scorer
 
 from src.strategies.base_strategy import Strategy
 from src.utils.tools import ema, rsi, sma
@@ -34,6 +36,8 @@ class XGBoostRegressionStrategy(Strategy):
         train_frac: float = 0.7,
         cv_splits: int = 5,
         rfecv_step: float = 0.1,
+        pca_n_components: float = 0.95,
+        use_pca: bool = True,
         param_grid: Dict[str, Any] = None,
         signal_thresh: float = 0.0, #Minimum daily return to trade
         random_state: int = 42,
@@ -47,6 +51,8 @@ class XGBoostRegressionStrategy(Strategy):
         # RFECV step size
         self.rfecv_step = rfecv_step
         self.random_state = random_state
+        self.use_pca         = use_pca
+        self.pca_n_components= pca_n_components
         self.n_iter_search = n_iter_search
         self.signal_thresh = np.log(signal_thresh + 1) #Consistent with log-target
 
@@ -60,26 +66,33 @@ class XGBoostRegressionStrategy(Strategy):
 
         # Build pipeline:
         # 1) Standardize features
-        # 2) RFECV wrapped around a base XGBRegressor
-        # 3) Final XGBRegressor
+        # 2) PCA
+        # 3) RFECV wrapped around a base XGBRegressor
+        # 4) Final XGBRegressor
+        steps = []
+        steps.append(('scaler', StandardScaler()))
+
+        if self.use_pca:
+            # If pca_n_components < 1.0, sklearn treats as fraction of variance
+            steps.append(('pca', PCA(n_components=self.pca_n_components, random_state=self.random_state)))
+
         inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
         base = XGBRegressor(
             objective='reg:squarederror',
             random_state=self.random_state,
             verbosity=0
         )
-        self.pipeline = Pipeline([
-            ('scaler', StandardScaler()),
-            ('rfecv', RFECV(
-                estimator=base,
-                step=self.rfecv_step,
-                cv=inner_cv,
-                # scoring='r2',
-                scoring=sharpe_scorer,
-                n_jobs=-1
-            )),
-            ('model', base)
-        ])
+
+        steps.append(('rfecv', RFECV(
+            estimator=base,
+            step=self.rfecv_step,
+            cv=inner_cv,
+            scoring='r2',
+            n_jobs=-1
+        )))
+
+        steps.append(('model', base))
+        self.pipeline = Pipeline(steps)
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -172,7 +185,7 @@ class XGBoostRegressionStrategy(Strategy):
         feat = feat.dropna()
 
         # 3) Split train / test
-        X = feat.drop(columns=['target','close','high','low','open','PE', 'forwardPE', 'PB', 'EPS', 'EBITDA', 'earningsGrowth'])
+        X = feat.drop(columns=['target','close','high','low','open'])            
         y = feat['target']
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, train_size=self.train_frac, shuffle=False
@@ -188,7 +201,6 @@ class XGBoostRegressionStrategy(Strategy):
                 param_distributions=self.param_grid,
                 n_iter=self.n_iter_search,
                 cv=outer_cv,
-                # scoring='neg_mean_squared_error',
                 # scoring='r2',
                 scoring=sharpe_scorer,
                 random_state=self.random_state,
@@ -200,7 +212,6 @@ class XGBoostRegressionStrategy(Strategy):
             estimator=self.pipeline,
             param_grid=self.param_grid,
             cv=outer_cv,
-            # scoring='neg_mean_squared_error',
             # scoring='r2',
             scoring=sharpe_scorer,
             n_jobs=-1
@@ -261,7 +272,7 @@ class XGBoostRegressionStrategy(Strategy):
             y_pred_series.at[t] = pred
             y_test_series.at[t] = test
             test_mask.at[t] = 1.0
-
+        print('Max prediction', y_pred_series.max())
         # 7) Merge signals into df
         out = df.copy()
         out["position"] = positions

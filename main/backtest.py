@@ -25,10 +25,10 @@ if __name__ == "__main__":
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["AAPL","MSFT"]
-    # symbols = ["HAG.DE"]
+    symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
     # symbols = ["HAG.DE","RHM.DE"]
-    symbols = ["NVDA"]
+    # symbols = ["NVDA"]
     # symbols = ["NDX"]
 
     # fetch_sp500_symbols()
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2020, 1, 1)
+    start   = datetime(2020, 10, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
@@ -130,13 +130,15 @@ if __name__ == "__main__":
         train_frac = 0.7,
         cv_splits = 5,
         rfecv_step = 0.1,
+        pca_n_components = 20,
+        use_pca = False,
         # param_grid = {
         #     'model__n_estimators': [50, 100, 200],
         #     'model__max_depth':    [3, 5, 7],
         #     'model__learning_rate': [0.01, 0.1, 0.2],
         #     'model__subsample':    [0.7, 1.0],
         # },
-        # signal_thresh = 0.1,
+        # signal_thresh = 0.05,
         n_iter_search = 50
     )
 
