@@ -14,7 +14,6 @@ from sklearn.feature_selection import RFECV
 from sklearn.metrics import r2_score
 from xgboost import XGBRegressor
 
-from src.data.data_loader import fetch_yahoo_fundamentals
 from src.strategies.base_strategy import Strategy
 from src.utils.indicators import ema, rsi, sma
 

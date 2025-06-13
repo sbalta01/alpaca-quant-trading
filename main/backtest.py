@@ -45,7 +45,7 @@ if __name__ == "__main__":
     start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
-    timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
+    timeframe = TimeFrame.Week  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
     #                             atr_window = 14, vol_threshold = 0.04)

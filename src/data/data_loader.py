@@ -1,9 +1,11 @@
 # src/data/data_loader.py
 
+import numpy as np
 import pandas as pd
 from datetime import datetime
 from typing import List, Union
 import yfinance as yf
+from pandas_datareader import data as pdr
 
 
 from alpaca.data.historical import StockHistoricalDataClient
@@ -175,11 +177,7 @@ def fetch_yahoo_data(
     out = pd.concat(data_frames).sort_index()
     return out
 
-def fetch_yahoo_fundamentals(symbols: List[str]) -> pd.DataFrame:
-    """
-    Returns a DataFrame indexed by symbol with columns like:
-      ['trailingPE','forwardPE','priceToBook','earningsQuarterlyGrowth','ebitda','earningsDate']
-    """
+def fetch_fundamentals(symbols: List[str]) -> pd.DataFrame:
     data = {}
     for sym in symbols:
         tkr = yf.Ticker(sym)
@@ -192,4 +190,86 @@ def fetch_yahoo_fundamentals(symbols: List[str]) -> pd.DataFrame:
             'EBITDA': info.get('ebitda'),
             'earningsGrowth': info.get('earningsQuarterlyGrowth')
         }
-    return pd.DataFrame.from_dict(data, orient='index')
+    df = pd.DataFrame.from_dict(data, orient='index')
+    df = df.replace({None: np.nan}) #If there is no data for this particular variable, just drop the column
+    df_clean = df.dropna(axis=1, how='any')
+    return df_clean
+
+FAMA_FRENCH_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip"
+def fetch_macro_series(
+    start: datetime, end: datetime, timeframe: str = "1d"
+) -> pd.DataFrame:
+    """
+    Fetch daily macro series:
+      - EUR/USD exchange: 'EURUSD=X'
+      - VIX index: '^VIX'
+      - US Fed funds rate: FRED 'DFF'
+      - Fama-French daily factors
+    Returns DataFrame indexed by date with columns
+      ['EURUSD','VIX','DFF','MKT','SMB','HML'].
+    """
+    # 1) FX & VIX
+    fx = yf.download(
+        "EURUSD=X", start=start, end=end, interval=timeframe, auto_adjust=False, progress=False
+        ).rename(columns={'Close':'EURUSD'})[['EURUSD']].dropna()
+    fx.columns = fx.columns.droplevel(1)
+    fx.index.name = "timestamp"
+    vix = yf.download(
+        "^VIX",    start=start, end=end, interval=timeframe, auto_adjust=False, progress=False
+        ).rename(columns={'Close':'VIX'})[['VIX']].dropna()
+    vix.index.name = "timestamp"
+    vix.columns = vix.columns.droplevel(1)
+
+    # 2) Fed funds rate
+    dff = pdr.DataReader("DFF", "fred", start, end)
+    dff.index.name = "timestamp"
+
+    # 3) Fama-French
+    ff = pd.read_csv(FAMA_FRENCH_URL, skiprows=3, index_col=0, skipfooter=1, engine = 'python')
+    ff.index = pd.to_datetime(ff.index.astype(str), format='%Y%m%d')
+    ff = ff.loc[start:end, ['Mkt-RF','SMB','HML','RMW','CMA','RF']].rename(columns={'Mkt-RF':'MKT'})
+    ff.index.name = "timestamp"
+
+    # 4) Merge all
+    df = pd.concat(
+        [fx, vix, dff, ff],
+        axis=1,
+        join='outer'   # union of all dates
+    ).sort_index().ffill().bfill() #Same value for all times
+    return df
+
+
+def attach_factors(
+    price_df: pd.DataFrame, timeframe: str = "1d"
+) -> pd.DataFrame:
+    """
+    Given `price_df` with MultiIndex (symbol,timestamp) and price columns,
+    fetch fundamentals & macro series, then return price_df augmented
+    with columns ['PE','PB','EPS','EBITDA','earningsGrowth','EURUSD','VIX','DFF','MKT','SMB','HML'].
+    """
+    # 1) Extract list of symbols and overall date range
+    dates   = price_df.index.get_level_values('timestamp').unique()
+    symbols   = price_df.index.get_level_values('symbol').unique()
+    start, end = dates.min(), dates.max()
+    # 2) Fetch
+    funds = fetch_fundamentals(symbols)       # indexed by symbol
+    macro = fetch_macro_series(start, end, timeframe=timeframe)    # indexed by date
+
+    # 3) Broadcast fundamentals to each symbol-date
+    #    Create a DataFrame with index=(symbol,timestamp) and the funds columns
+    idx = price_df.index
+    funds_panel = pd.DataFrame(index=idx)
+    for col in funds.columns:
+        # map each symbol to its fundamental
+        funds_panel[col] = idx.get_level_values('symbol').map(funds[col])
+
+    # 4) Broadcast macro to each (symbol,timestamp)
+    macro_panel = pd.DataFrame(index=idx)
+    # normalize timestamps to date
+    ts_dates = pd.to_datetime(idx.get_level_values('timestamp').normalize())
+    for col in macro.columns:
+        macro_panel[col] = macro[col].reindex(ts_dates).values
+
+    # 5) Concatenate to original
+    augmented = pd.concat([price_df, funds_panel, macro_panel], axis=1).ffill() #Fill last row with previous value
+    return augmented

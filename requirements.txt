@@ -8,3 +8,4 @@ yfinance
 lxml
 statsmodels
 xgboost
+pandas_datareader

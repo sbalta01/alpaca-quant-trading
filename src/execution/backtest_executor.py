@@ -8,6 +8,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from src.backtesting.backtester import BacktestEngine
+from src.data.data_loader import attach_factors
 from src.strategies.base_strategy import Strategy
 from src.strategies.buy_and_hold import BuyAndHoldStrategy
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
@@ -39,36 +40,29 @@ def run_backtest_strategy(
         MultiIndex [symbol, timestamp] if multiple symbols, else DatetimeIndex.
     """
     # 1) Fetch historical data
+    if timeframe.unit_value == TimeFrameUnit.Month:
+        print('Timeframe set to Month')
+        timeframe_yahoo = '1mo'
+    elif timeframe.unit_value == TimeFrameUnit.Week:
+        print('Timeframe set to Week')
+        timeframe_yahoo = '1wk'
+    elif timeframe.unit_value == TimeFrameUnit.Day:
+        print('Timeframe set to Day')
+        timeframe_yahoo = '1d'
+    elif timeframe.unit_value == TimeFrameUnit.Hour:
+        print('Timeframe set to Hour')
+        timeframe_yahoo = '1h'
+    elif timeframe.unit_value == TimeFrameUnit.Minute:
+        print('Timeframe set to Minute')
+        timeframe_yahoo = '1m'
     try:
         from src.data.data_loader import fetch_alpaca_data as fetch_data
-        df = fetch_data(
-        symbol=symbols,
-        start=start,
-        end=end,
-        timeframe=timeframe,
-        feed = feed
-        )
-        jnksac
+        jkandc
         print('USING ALPACA DATA')
     except:
         from src.data.data_loader import fetch_yahoo_data as fetch_data
         print('USING YAHOO DATA')
-        if timeframe.unit_value == TimeFrameUnit.Month:
-            print('Timeframe set to Month')
-            timeframe = '1mo'
-        elif timeframe.unit_value == TimeFrameUnit.Week:
-            print('Timeframe set to Week')
-            timeframe = '1wk'
-        elif timeframe.unit_value == TimeFrameUnit.Day:
-            print('Timeframe set to Day')
-            timeframe = '1d'
-        elif timeframe.unit_value == TimeFrameUnit.Hour:
-            print('Timeframe set to Hour')
-            timeframe = '1h'
-        elif timeframe.unit_value == TimeFrameUnit.Minute:
-            print('Timeframe set to Minute')
-            timeframe = '1m'
-        
+        timeframe = timeframe_yahoo
         feed = None
 
     delta = end - start
@@ -113,6 +107,9 @@ def run_backtest_strategy(
         df_control = df.copy()
         start_control = start
     num_years = delta.days / 365
+
+    df = attach_factors(df, timeframe=timeframe_yahoo)
+
     # 2) Initialize and run backtest
     engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock)
     results = engine.run()
