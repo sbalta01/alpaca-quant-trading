@@ -6,7 +6,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import GradientBoostingClassifier
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import sma, ema, rsi
+from src.utils.tools import sma, ema, rsi
 
 class RollingWindowStrategy(Strategy):
     """

@@ -15,7 +15,7 @@ from sklearn.metrics import r2_score
 from xgboost import XGBRegressor
 
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import ema, rsi, sma
+from src.utils.tools import ema, rsi, sma
 
 class XGBoostRegressionStrategy(Strategy):
     """
@@ -70,13 +70,14 @@ class XGBoostRegressionStrategy(Strategy):
         )
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            # ('rfecv', RFECV(
-            #     estimator=base,
-            #     step=self.rfecv_step,
-            #     cv=inner_cv,
-            #     scoring='r2',
-            #     n_jobs=-1
-            # )),
+            ('rfecv', RFECV(
+                estimator=base,
+                step=self.rfecv_step,
+                cv=inner_cv,
+                # scoring='r2',
+                scoring=sharpe_scorer,
+                n_jobs=-1
+            )),
             ('model', base)
         ])
 
@@ -171,7 +172,7 @@ class XGBoostRegressionStrategy(Strategy):
         feat = feat.dropna()
 
         # 3) Split train / test
-        X = feat.drop(columns=['target','close','high','low','open'])
+        X = feat.drop(columns=['target','close','high','low','open','PE', 'forwardPE', 'PB', 'EPS', 'EBITDA', 'earningsGrowth'])
         y = feat['target']
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, train_size=self.train_frac, shuffle=False
@@ -188,7 +189,8 @@ class XGBoostRegressionStrategy(Strategy):
                 n_iter=self.n_iter_search,
                 cv=outer_cv,
                 # scoring='neg_mean_squared_error',
-                scoring='r2',
+                # scoring='r2',
+                scoring=sharpe_scorer,
                 random_state=self.random_state,
                 n_jobs=-1
             )
@@ -199,7 +201,8 @@ class XGBoostRegressionStrategy(Strategy):
             param_grid=self.param_grid,
             cv=outer_cv,
             # scoring='neg_mean_squared_error',
-            scoring='r2',
+            # scoring='r2',
+            scoring=sharpe_scorer,
             n_jobs=-1
             )
             print('Grid Search CV')

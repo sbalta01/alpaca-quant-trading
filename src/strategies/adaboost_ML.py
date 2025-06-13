@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import remove_outliers, sma, ema, rsi
+from src.utils.tools import remove_outliers, sma, ema, rsi
 
 class AdaBoostStrategy(Strategy):
     """

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import sma, rsi
+from src.utils.tools import sma, rsi
 
 class RandomForestStrategy(Strategy):
     """

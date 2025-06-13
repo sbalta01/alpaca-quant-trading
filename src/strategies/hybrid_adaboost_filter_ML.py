@@ -6,7 +6,7 @@ from typing import Optional
 
 from src.strategies.base_strategy import Strategy
 from src.strategies.adaboost_ML import AdaBoostStrategy
-from src.utils.indicators import atr
+from src.utils.tools import atr
 
 
 class HybridAdaBoostFilterStrategy(Strategy):

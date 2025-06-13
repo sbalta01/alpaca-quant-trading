@@ -13,7 +13,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import remove_outliers
+from src.utils.tools import remove_outliers
 
 
 class PenalizedRegressionStrategy(Strategy):

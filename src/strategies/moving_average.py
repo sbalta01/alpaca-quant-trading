@@ -2,7 +2,7 @@
 
 import numpy as np
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import atr, sma, ema, rsi
+from src.utils.tools import atr, sma, ema, rsi
 import pandas as pd
 
 class MovingAverageStrategy(Strategy):

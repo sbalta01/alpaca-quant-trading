@@ -2,7 +2,7 @@
 
 import pandas as pd
 from src.strategies.base_strategy import Strategy
-from src.utils.indicators import sma
+from src.utils.tools import sma
 
 class BollingerMeanReversionStrategy(Strategy):
     """
