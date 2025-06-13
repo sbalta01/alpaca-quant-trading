@@ -257,10 +257,10 @@ def attach_factors(
     # 3) Broadcast fundamentals to each symbol-date
     #    Create a DataFrame with index=(symbol,timestamp) and the funds columns
     idx = price_df.index
-    funds_panel = pd.DataFrame(index=idx)
-    for col in funds.columns:
-        # map each symbol to its fundamental
-        funds_panel[col] = idx.get_level_values('symbol').map(funds[col])
+    # funds_panel = pd.DataFrame(index=idx)
+    # for col in funds.columns:
+    #     # map each symbol to its fundamental
+    #     funds_panel[col] = idx.get_level_values('symbol').map(funds[col])
 
     # 4) Broadcast macro to each (symbol,timestamp)
     macro_panel = pd.DataFrame(index=idx)
@@ -270,5 +270,6 @@ def attach_factors(
         macro_panel[col] = macro[col].reindex(ts_dates).values
 
     # 5) Concatenate to original
-    augmented = pd.concat([price_df, funds_panel, macro_panel], axis=1).ffill() #Fill last row with previous value
+    # augmented = pd.concat([price_df, funds_panel, macro_panel], axis=1).ffill() #Fill last row with previous value
+    augmented = pd.concat([price_df, macro_panel], axis=1).ffill() #Fill last row with previous value
     return augmented
