@@ -25,6 +25,4 @@ def sharpe_from_signals(y_true: np.ndarray, y_pred: np.ndarray, freq: float = 25
 sharpe_scorer = make_scorer(
     sharpe_from_signals,
     greater_is_better=True,
-    needs_proba=False,   # we pass y_pred directly
-    needs_threshold=False
 )
