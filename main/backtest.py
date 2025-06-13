@@ -130,7 +130,7 @@ if __name__ == "__main__":
         train_frac = 0.7,
         cv_splits = 5,
         rfecv_step = 0.1,
-        pca_n_components = 20,
+        pca_n_components = 25,
         use_pca = False,
         # param_grid = {
         #     'model__n_estimators': [50, 100, 200],
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         #     'model__learning_rate': [0.01, 0.1, 0.2],
         #     'model__subsample':    [0.7, 1.0],
         # },
-        # signal_thresh = 0.05,
+        signal_thresh = 0.08,
         n_iter_search = 50
     )
 
