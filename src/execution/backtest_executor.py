@@ -108,7 +108,8 @@ def run_backtest_strategy(
         start_control = start
     num_years = delta.days / 365
 
-    df = attach_factors(df, timeframe=timeframe_yahoo)
+    if strategy.name == "XGBoostRegression":
+        df = attach_factors(df, timeframe=timeframe_yahoo)
 
     # 2) Initialize and run backtest
     engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock)

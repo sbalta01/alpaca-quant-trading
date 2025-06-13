@@ -191,8 +191,7 @@ def fetch_fundamentals(symbols: List[str]) -> pd.DataFrame:
             'earningsGrowth': info.get('earningsQuarterlyGrowth')
         }
     df = pd.DataFrame.from_dict(data, orient='index')
-    df = df.replace({None: np.nan}) #If there is no data for this particular variable, just drop the column
-    df_clean = df.dropna(axis=1, how='any')
+    df_clean = df.dropna(axis=1, how='any') #If there is no data for a particular variable (eg, an ETF), just drop the column
     return df_clean
 
 FAMA_FRENCH_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip"

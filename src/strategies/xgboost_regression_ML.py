@@ -25,7 +25,7 @@ class XGBoostRegressionStrategy(Strategy):
       - RFECV for feature selection, GridSearchCV for hyperparams
     Emits +1 long / -1 short signals based on next-bar return prediction.
     """
-    name = "XGBoostRegr"
+    name = "XGBoostRegression"
     multi_symbol = False
 
     def __init__(
@@ -35,7 +35,7 @@ class XGBoostRegressionStrategy(Strategy):
         cv_splits: int = 5,
         rfecv_step: float = 0.1,
         param_grid: Dict[str, Any] = None,
-        signal_thresh: float = 0.002, #Minimum daily return to trade
+        signal_thresh: float = 0.0, #Minimum daily return to trade
         random_state: int = 42,
         n_iter_search: int = 50
     ):
@@ -70,13 +70,13 @@ class XGBoostRegressionStrategy(Strategy):
         )
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            ('rfecv', RFECV(
-                estimator=base,
-                step=self.rfecv_step,
-                cv=inner_cv,
-                scoring='r2',
-                n_jobs=-1
-            )),
+            # ('rfecv', RFECV(
+            #     estimator=base,
+            #     step=self.rfecv_step,
+            #     cv=inner_cv,
+            #     scoring='r2',
+            #     n_jobs=-1
+            # )),
             ('model', base)
         ])
 
@@ -170,16 +170,6 @@ class XGBoostRegressionStrategy(Strategy):
         feat['target'] = np.log(feat['close'].shift(-self.horizon)/feat['close'])
         feat = feat.dropna()
 
-        
-        
-        # # 2) Merge in factor variables (assumed present in df)
-        # factors = ['EPR','BMR','EBITDA','EPS','PE','earnings_growth',
-        #            'FF_MKT','FF_SMB','FF_HML','EUR_USD','interest_rate','VIX']
-        # for fcol in factors:
-        #     feat[fcol] = df[fcol].reindex(feat.index)
-
-        # feat = feat.dropna()  # require all factor data
-
         # 3) Split train / test
         X = feat.drop(columns=['target','close','high','low','open'])
         y = feat['target']
@@ -217,13 +207,16 @@ class XGBoostRegressionStrategy(Strategy):
         gs.fit(X_train, y_train)
         best = gs.best_estimator_
 
-        support_mask = best.named_steps['rfecv'].support_
-        feature_names = X_train.columns
-        selected = feature_names[support_mask]
-        ranking = best.named_steps['rfecv'].ranking_
-        print(f"[{self.name}] RFECV selected {len(selected)}/{len(feature_names)} features. Ranking:")
-        for feature_name, rank in zip(feature_names, ranking):
-            print(f"{feature_name:15s} → rank {rank}")
+        try:
+            support_mask = best.named_steps['rfecv'].support_
+            feature_names = X_train.columns
+            selected = feature_names[support_mask]
+            ranking = best.named_steps['rfecv'].ranking_
+            print(f"[{self.name}] RFECV selected {len(selected)}/{len(feature_names)} features. Ranking:")
+            for feature_name, rank in zip(feature_names, ranking):
+                print(f"{feature_name:15s} → rank {rank}")
+        except:
+            print('No RFECV')
 
         # 5) Evaluate R²
         y_pred = pd.Series(best.predict(X_test), index=X_test.index)

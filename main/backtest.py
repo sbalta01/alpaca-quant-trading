@@ -41,11 +41,11 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    # start   = datetime(2015, 1, 1)
-    start   = datetime(2025, 1, 5)
+    start   = datetime(2020, 1, 1)
+    # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
-    timeframe = TimeFrame.Week  # or pd.Timedelta(days=1)
+    timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
     #                             atr_window = 14, vol_threshold = 0.04)
@@ -130,13 +130,13 @@ if __name__ == "__main__":
         train_frac = 0.7,
         cv_splits = 5,
         rfecv_step = 0.1,
-        # param_grid = {
-        #     'model__n_estimators': [50, 100, 200],
-        #     'model__max_depth':    [3, 5, 7],
-        #     'model__learning_rate': [0.01, 0.1, 0.2],
-        #     'model__subsample':    [0.7, 1.0],
-        # },
-        signal_thresh = 0.005,
+        param_grid = {
+            'model__n_estimators': [50, 100, 200],
+            'model__max_depth':    [3, 5, 7],
+            'model__learning_rate': [0.01, 0.1, 0.2],
+            'model__subsample':    [0.7, 1.0],
+        },
+        # signal_thresh = 0.005,
         n_iter_search = 50
     )
 
