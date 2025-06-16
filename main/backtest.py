@@ -7,6 +7,7 @@ import pandas as pd
 from src.data.data_loader import fetch_nasdaq_100_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
 from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
+from src.strategies.lstm_event_strategy_ML import LSTMEventStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_returns, plot_signals
@@ -28,6 +29,7 @@ if __name__ == "__main__":
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
     symbols = ["IDR.MC"]
+    # symbols = ["ECR.MC"]
     # symbols = ["HAG.DE","RHM.DE"]
     # symbols = ["NVDA"]
     # symbols = ["NDX"]
@@ -42,8 +44,8 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2020, 10, 1)
-    # start   = datetime(2025, 1, 5)
+    # start   = datetime(2020, 10, 1)
+    start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
@@ -126,21 +128,27 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    strat = XGBoostRegressionStrategy(
-        horizon = 20,
+    # strat = XGBoostRegressionStrategy(
+    #     horizon = 20,
+    #     train_frac = 0.7,
+    #     cv_splits = 5,
+    #     rfecv_step = 0.1,
+    #     pca_n_components = 25,
+    #     use_pca = False,
+    #     # param_grid = {
+    #     #     'model__n_estimators': [50, 100, 200],
+    #     #     'model__max_depth':    [3, 5, 7],
+    #     #     'model__learning_rate': [0.01, 0.1, 0.2],
+    #     #     'model__subsample':    [0.7, 1.0],
+    #     # },
+    #     # signal_thresh = 0.08,
+    #     n_iter_search = 50
+    # )
+
+    strat = LSTMEventStrategy(
+        horizon=20,        # predict horizon-day return
+        threshold=0.05,   # event = next-horizon-day log-return > threshold%
         train_frac = 0.7,
-        cv_splits = 5,
-        rfecv_step = 0.1,
-        pca_n_components = 25,
-        use_pca = False,
-        # param_grid = {
-        #     'model__n_estimators': [50, 100, 200],
-        #     'model__max_depth':    [3, 5, 7],
-        #     'model__learning_rate': [0.01, 0.1, 0.2],
-        #     'model__subsample':    [0.7, 1.0],
-        # },
-        # signal_thresh = 0.08,
-        n_iter_search = 50
     )
 
     start_backtest = time.perf_counter()
