@@ -35,7 +35,7 @@ class BacktestEngine:
     def _run_single(self, df: pd.DataFrame) -> pd.DataFrame:
         df['returns'] = (df['close'].pct_change() * df['position'].shift(1)).fillna(0.0)
         df['cum_returns'] = ((1 + df['returns']).cumprod() - 1).fillna(0.0)
-        df['equity'] = self.initial_cash_per_stock * (1+ df['cum_returns'])
+        df['equity'] = self.initial_cash_per_stock * (1 + df['cum_returns'])
         return df
 
     def run(self) -> pd.DataFrame:
@@ -105,11 +105,10 @@ class BacktestEngine:
             # Turnover = sum |Δposition| / len
             pos = (results["equity"] / results['close']).groupby(level="timestamp").mean()  # Avg count share (across all symbols)
             # approximate turnover as fraction of portfolio traded
-            print(np.abs(np.diff(pos)))
-            to = np.mean(np.abs(np.diff(pos)))  
+            to = np.mean(np.abs(np.diff(pos)))
 
             # Fitness = sharpe / turnover
-            fitness = sharpe / to if to>0 else np.nan
+            fitness = sharpe / to if to > 0 else np.nan
 
             try:
                 total_cm = np.array([[0, 0], [0, 0]])
