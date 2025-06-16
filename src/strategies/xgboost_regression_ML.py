@@ -256,6 +256,7 @@ class XGBoostRegressionStrategy(Strategy):
         position = 0
         days_left = 0
         for t, pred, test in zip(idxs, y_pred, y_test):
+            print(pred)
             if days_left > 0:
                 days_left -= 1
             else:

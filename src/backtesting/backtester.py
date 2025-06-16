@@ -80,7 +80,7 @@ class BacktestEngine:
         final_cum_returns = total_cum_returns.iloc[-1] 
         profit = final_equity - initial_cash
 
-        def metrics(total_returns, total_equity): #All metrics are calculated in a Day TimeFrame
+        def metrics(total_returns): #All metrics are calculated in a Day TimeFrame
             # Annualization factor
             ann = np.sqrt(252)
             mean = np.mean(total_returns); std = np.std(total_returns, ddof=1)
@@ -103,8 +103,9 @@ class BacktestEngine:
             calmar = cagr/abs(max_drawdown) if max_drawdown<0 else np.nan
 
             # Turnover = sum |Δposition| / len
-            pos = total_equity / results['close'].groupby(level="timestamp").mean()  # Avg count share (across all symbols)
+            pos = (results["equity"] / results['close']).groupby(level="timestamp").mean()  # Avg count share (across all symbols)
             # approximate turnover as fraction of portfolio traded
+            print(np.abs(np.diff(pos)))
             to = np.mean(np.abs(np.diff(pos)))  
 
             # Fitness = sharpe / turnover
@@ -136,7 +137,7 @@ class BacktestEngine:
 
             return initial_cash, final_equity, profit, max_drawdown, cagr, final_cum_returns, sharpe, sortino, calmar, to, fitness, ML_metrics
 
-        agg = metrics(total_returns,total_equity)
+        agg = metrics(total_returns)
         out = dict(zip(
             ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness', 'ML metrics'],
             agg

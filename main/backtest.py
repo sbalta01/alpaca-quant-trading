@@ -25,8 +25,9 @@ if __name__ == "__main__":
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["AAPL","MSFT"]
-    symbols = ["HAG.DE"]
+    # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
+    symbols = ["IDR.MC"]
     # symbols = ["HAG.DE","RHM.DE"]
     # symbols = ["NVDA"]
     # symbols = ["NDX"]
@@ -138,7 +139,7 @@ if __name__ == "__main__":
         #     'model__learning_rate': [0.01, 0.1, 0.2],
         #     'model__subsample':    [0.7, 1.0],
         # },
-        signal_thresh = 0.08,
+        # signal_thresh = 0.08,
         n_iter_search = 50
     )
 
