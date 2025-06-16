@@ -256,19 +256,22 @@ class XGBoostRegressionStrategy(Strategy):
         position = 0
         days_left = 0
         for t, pred, test in zip(idxs, y_pred, y_test):
-            print(pred)
             if days_left > 0:
                 days_left -= 1
             else:
-                if position == 0:
-                    if pred > self.signal_thresh:
-                        position = 1
-                        days_left = self.horizon - 1
-                    elif pred < -self.signal_thresh:
-                        position = -1
-                        days_left = self.horizon - 1
-                elif (position==1 and pred <= -self.signal_thresh) or (position==-1 and pred>=self.signal_thresh):
-                    position = 0 # exit to flat
+                if position == 0 and pred > self.signal_thresh:
+                    position = 1
+                    days_left = self.horizon - 1
+                elif position == 1 and pred <= 0.0:
+                    position = 0 #exit to flat
+                    # if pred > self.signal_thresh:
+                    #     position = 1
+                    #     days_left = self.horizon - 1
+                #     elif pred < -self.signal_thresh:
+                #         position = -1
+                #         days_left = self.horizon - 1
+                # elif (position==1 and pred <= -self.signal_thresh) or (position==-1 and pred>=self.signal_thresh):
+                #     position = 0 # exit to flat
             positions.at[t] = position
             y_pred_series.at[t] = pred
             y_test_series.at[t] = test
