@@ -108,7 +108,7 @@ def run_backtest_strategy(
         start_control = start
     num_years = delta.days / 365
 
-    if strategy.name == "XGBoostRegression":
+    if strategy.name == "XGBoostRegression" or strategy.name == 'LSTMEvent':
         df = attach_factors(df, timeframe=timeframe_yahoo)
         print('Macros fetched')
 
@@ -130,7 +130,8 @@ def run_backtest_strategy(
     print(f"Sortino      : {perf['Sortino']:.2f}  |  Benchmark: {perf_ctrl['Sortino']:.2f}  |  >1.5 good. Focuses only on downside volatility")
     print(f"Calmar       : {perf['Calmar']:.2f}  |  Benchmark: {perf_ctrl['Calmar']:.2f}  |  >1 good. Higher is more reward for risk")
     print(f"Turnover     : {perf['Turnover']:.4f} |  Benchmark: {perf_ctrl['Turnover']:.4f}  |  0.1-0.5 okay/good, >1 bad. Higher is worse (unless transaction-free)")
-    print(f"Fitness      : {perf['Fitness']:.2f} |  Benchmark: {perf_ctrl['Fitness']:.2f}  |  >1 strong. Good for comparing strategies (How good is my strategy per trade)\n")
+    print(f"Fitness      : {perf['Fitness']:.2f} |  Benchmark: {perf_ctrl['Fitness']:.2f}  |  >1 strong. Good for comparing strategies (How good is my strategy per trade)")
+    print(f"Profit per Trade      : {perf['Profit per Trade']*100:.2f}%  |  Benchmark: {perf_ctrl['Profit per Trade']*100:.2f}%  | How good is my strategy per trade\n")
 
     try:
         print("ML metrics")

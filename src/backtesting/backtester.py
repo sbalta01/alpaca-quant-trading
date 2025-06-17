@@ -111,6 +111,9 @@ class BacktestEngine:
             # Fitness = sharpe / turnover
             fitness = sharpe / to if to > 0 else np.nan
 
+            num_trades = np.abs(results['signal']).sum()/2
+            profit_per_trade = final_cum_returns/num_trades
+
             try:
                 total_cm = np.array([[0, 0], [0, 0]])
                 for symbol, subdf in results.groupby(level="symbol"):
@@ -135,11 +138,11 @@ class BacktestEngine:
             except:
                 ML_metrics = {'No ML algorithm': ['','']}
 
-            return initial_cash, final_equity, profit, max_drawdown, cagr, final_cum_returns, sharpe, sortino, calmar, to, fitness, ML_metrics
+            return initial_cash, final_equity, profit, max_drawdown, cagr, final_cum_returns, sharpe, sortino, calmar, to, fitness, profit_per_trade, ML_metrics
 
         agg = metrics(total_returns)
         out = dict(zip(
-            ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness', 'ML metrics'],
+            ['Initial Cash', 'Final Equity','Profit','Max Drawdown','CAGR','Final Return','Sharpe','Sortino','Calmar','Turnover','Fitness', 'Profit per Trade', 'ML metrics'],
             agg
         ))
         return out
