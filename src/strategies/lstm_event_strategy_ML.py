@@ -114,7 +114,6 @@ class LSTMEventStrategy(Strategy):
         garch_p: int = 1,
         garch_q: int = 1,
         cv_splits: int = 5,
-        rfecv_step: float = 0.1,
         lstm_hidden: int = 32,
         lstm_dropout: float = 0.2,
         random_state: int = 42
