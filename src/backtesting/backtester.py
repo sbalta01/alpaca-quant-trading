@@ -98,14 +98,15 @@ class BacktestEngine:
             # max_drawdown = (((total_returns+1) / (total_returns+1).cummax()) - 1).min() ##Equivalent
 
             # Calmar = CAGR / |maxDD|
-            cagr = cum.iloc[-1]**(1/num_years) -1
+            cagr = cum.iloc[-1]**(1/num_years) - 1
             # cagr = ((final_returns + 1) ** (1 / num_years) - 1) ##Equivalent
             calmar = cagr/abs(max_drawdown) if max_drawdown<0 else np.nan
 
-            # Turnover = sum |Δposition| / len
-            pos = (results["equity"] / results['close']).groupby(level="timestamp").mean()  # Avg count share (across all symbols)
-            # approximate turnover as fraction of portfolio traded
-            to = np.mean(np.abs(np.diff(pos)))
+            cash_traded = results['equity'] * results['signal']  # Open positions in cash units
+            # Turnover as fraction of portfolio traded
+            cash_bought = cash_traded.loc[cash_traded>0].sum()
+            cash_sold = -cash_traded.loc[cash_traded<0].sum()
+            to = min(cash_bought,cash_sold)/final_equity
 
             # Fitness = sharpe / turnover
             fitness = sharpe / to if to > 0 else np.nan
