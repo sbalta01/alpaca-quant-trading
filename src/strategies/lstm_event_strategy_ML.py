@@ -117,7 +117,7 @@ class LSTMEventStrategy(Strategy):
 
         self.recall_scorer = make_scorer(recall_score)
 
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'  # ADD: choose GPU if available
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         net = NeuralNetClassifier(
             module              = LSTMClassifierModule,
@@ -132,11 +132,11 @@ class LSTMEventStrategy(Strategy):
             train_split         = None,
             iterator_train__shuffle = False,
             verbose             = 0,
-            device              = device  # ADD: device parameter
+            device              = device
         )
 
         # Precompute expensive features once, then use simpler pipeline
-        self.feature_transform = Pipeline([  # ADD: decoupled feature eng
+        self.feature_transform = Pipeline([ 
             ('arima_garch_kf', ARIMAGARCHKalmanTransformer(
                 arima_order=arima_order,
                 garch_p=garch_p, garch_q=garch_q
@@ -146,7 +146,6 @@ class LSTMEventStrategy(Strategy):
         ])
 
         self.pipeline = Pipeline([
-            # --- Removed: ARIMAGARCH & technical inside main pipeline
             ('select', RFECV(
                 estimator=net,
                 step=rfecv_step,
@@ -167,7 +166,6 @@ class LSTMEventStrategy(Strategy):
         X_feat = self.feature_transform.fit_transform(feat)
         y_feat = feat['event'].values
 
-        # build sequences same as before...
         X_seqs, y_labels, times = [], [], []
         for i in range(len(X_feat) - self.horizon):
             win = X_feat[i : i + self.horizon]
@@ -215,7 +213,7 @@ class LSTMEventStrategy(Strategy):
         test_acc  = search.score(X_test,  y_test)
         print(f"Train acc: {train_acc:.3f}, Test acc: {test_acc:.3f}")
 
-        # 6) Build a signal series (only +1 entries; exits via backtest logic)
+        # 6) Build a signal series
         positions = pd.Series(np.nan, index=feat.index)
         positions.at[times_train[0]] = 0.0
         y_pred_series = pd.Series(0.0, index=feat.index)
