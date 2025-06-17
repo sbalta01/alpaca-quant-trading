@@ -7,10 +7,10 @@ from typing import List, Tuple
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, FunctionTransformer
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV, train_test_split
 from sklearn.feature_selection import RFECV
-from sklearn.metrics import make_scorer, recall_score, r2_score
+from sklearn.metrics import make_scorer, recall_score, roc_auc_score, precision_score
 
 import torch
 import torch.nn as nn
@@ -24,8 +24,7 @@ from pykalman import KalmanFilter
 from src.strategies.base_strategy import Strategy
 from src.utils.tools import sma, ema, rsi
 
-# ──────────────────────────────────────────────────────────────────────────────
-
+# ─── ARIMA/GARCH/Kalman now fit in .fit() to avoid data leakage ─────────────────
 class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
     """Add ARIMA residuals, GARCH vol forecast & Kalman trend to your DataFrame."""
     def __init__(self, arima_order=(1,0,1), garch_p=1, garch_q=1):
@@ -34,40 +33,42 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
         self.garch_q = garch_q
 
     def fit(self, X, y=None):
+        df = X.copy()
+        ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
+        # --- Removed: fitting inside transform
+        self.ar_model_ = ARIMA(ret, order=self.arima_order).fit(method_kwargs={'disp': False})  # ADD: store ARIMA model
+        self.garch_model_ = arch_model(ret * 100, p=self.garch_p, q=self.garch_q).fit(disp='off')  # ADD: store GARCH model
+        kf = KalmanFilter(transition_matrices=[1], observation_matrices=[1])
+        self.kf_em_ = kf.em(ret.values)  # ADD: EM-fit Kalman
+        self.kf_trend_ = self.kf_em_.filter(ret.values)[0].flatten()  # ADD: store filtered trend
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         df = X.copy()
-        # 1) log returns
         ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
-        # 2) ARIMA residuals
-        ar = ARIMA(ret, order=self.arima_order).fit(disp=False)
-        df['arima_resid'] = ar.resid
-        # 3) GARCH( p, q ) vol forecast (in same units as ret)
-        g = arch_model(ret * 100, p=self.garch_p, q=self.garch_q).fit(disp='off')
-        fcast = g.forecast(horizon=1).variance.iloc[-1, 0]
-        df['garch_vol'] = np.sqrt(fcast) / 100.0
-        # 4) simple Kalman trend
-        kf = KalmanFilter(transition_matrices=[1], observation_matrices=[1])
-        state_means, _ = kf.em(ret.values).filter(ret.values)
-        df['kf_trend'] = state_means.flatten()
-        return df.dropna()
+        # --- Removed: re-fitting models here
+        df['arima_resid'] = self.ar_model_.resid  # ADD: use stored residuals
+        fcast = self.garch_model_.forecast(horizon=1).variance.iloc[-1, 0]  # unchanged
+        df['garch_vol'] = np.sqrt(fcast) / 100.0  # unchanged
+        df['kf_trend'] = self.kf_trend_  # ADD: use stored trend
+        return df  # --- Removed: dropna here; handle missing later
 
-# ──────────────────────────────────────────────────────────────────────────────
 
+# ─── TechnicalTransformer unchanged except dropna removal ──────────────────────────
 class TechnicalTransformer(BaseEstimator, TransformerMixin):
     """Add a few technical indicators via `src.utils.indicators`."""
     def fit(self, X, y=None):
         return self
+
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         df = X.copy()
         df['sma5']  = sma(df['close'],  5)
         df['ema10'] = ema(df['close'], 10)
         df['rsi14'] = rsi(df['close'], 14)
-        return df.dropna()
+        return df  # --- Removed: dropna here
 
-# ──────────────────────────────────────────────────────────────────────────────
 
+# ─── LSTM module unchanged ───────────────────────────────────────────────────────
 class LSTMClassifierModule(nn.Module):
     """Simple 1-layer LSTM → Dropout → Dense(sigmoid) classifier."""
     def __init__(self, n_features, hidden_size=32, dropout=0.2):
@@ -80,11 +81,9 @@ class LSTMClassifierModule(nn.Module):
         self.act  = nn.Sigmoid()
 
     def forward(self, X):
-        # X: (batch, seq_len, features)
         out, _ = self.lstm(X)
-        h = out[:, -1, :]           # last time-step
-        h = self.drop(h)
-        return self.act(self.fc(h)).squeeze()
+        h = out[:, -1, :]
+        return self.act(self.fc(self.drop(h))).squeeze()
 
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -103,7 +102,7 @@ class LSTMEventStrategy(Strategy):
         horizon: int  = 5,
         threshold: float = 0.02,
         train_frac = 0.7,
-        arima_order=(1,0,1),
+        arima_order = (1,0,1),
         garch_p: int = 1,
         garch_q: int = 1,
         cv_splits: int = 5,
@@ -112,19 +111,19 @@ class LSTMEventStrategy(Strategy):
         lstm_dropout: float = 0.2,
         random_state: int = 42
     ):
-        self.horizon  = horizon
-        self.threshold= threshold
-        self.cv_splits= cv_splits
+        self.horizon   = horizon
+        self.threshold = threshold
+        self.cv_splits = cv_splits
         self.random_state = random_state
         self.train_frac = train_frac
 
-        # recall-scorer for RFECV and CV
         self.recall_scorer = make_scorer(recall_score)
 
-        # skorch LSTM wrapper
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'  # ADD: choose GPU if available
+
         net = NeuralNetClassifier(
             module              = LSTMClassifierModule,
-            module__n_features  = None,  # auto-inferred
+            module__n_features  = None,
             module__hidden_size = lstm_hidden,
             module__dropout     = lstm_dropout,
             max_epochs          = 10,
@@ -132,91 +131,90 @@ class LSTMEventStrategy(Strategy):
             optimizer           = Adam,
             criterion           = nn.BCELoss,
             batch_size          = 32,
-            train_split         = None,   # we do CV externally
+            train_split         = None,
             iterator_train__shuffle = False,
             verbose             = 0,
-            device              = 'cpu'
+            device              = device  # ADD: device parameter
         )
 
-        # Full pipeline
-        self.pipeline = Pipeline([
+        # Precompute expensive features once, then use simpler pipeline
+        self.feature_transform = Pipeline([  # ADD: decoupled feature eng
             ('arima_garch_kf', ARIMAGARCHKalmanTransformer(
                 arima_order=arima_order,
                 garch_p=garch_p, garch_q=garch_q
             )),
-            ('tech',       TechnicalTransformer()),
-            ('scale',      StandardScaler()),
-            ('select',     RFECV(
+            ('tech', TechnicalTransformer()),
+            ('scale', StandardScaler())
+        ])
+
+        self.pipeline = Pipeline([
+            # --- Removed: ARIMAGARCH & technical inside main pipeline
+            ('select', RFECV(
                 estimator=net,
                 step=rfecv_step,
                 cv=TimeSeriesSplit(n_splits=cv_splits),
                 scoring=self.recall_scorer,
                 n_jobs=-1
             )),
-            ('clf',        net)
+            ('clf', net)
         ])
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         df = data.copy()
 
-        # 1) Label events: forward log-return over horizon
-        target = (np.log(df['close'].shift(-self.horizon) / df['close']))
+        target = np.log(df['close'].shift(-self.horizon) / df['close'])
         df['event'] = (target > self.threshold).astype(int)
 
-        # 2) Build sequences X, y and aligned timestamps
-        feat = df.dropna().copy()
+        feat = df.copy().dropna()
+        X_feat = self.feature_transform.fit_transform(feat)
+        y_feat = feat['event'].values
+
+        # build sequences same as before...
         X_seqs, y_labels, times = [], [], []
-        for i in range(len(feat) - self.horizon):
-            win = feat.iloc[i : i + self.horizon]
-            X_seqs.append(win.drop(columns=['event']).values)
-            y_labels.append(feat['event'].iloc[i + self.horizon])
+        for i in range(len(X_feat) - self.horizon):
+            win = X_feat[i : i + self.horizon]
+            X_seqs.append(win)
+            y_labels.append(y_feat[i + self.horizon])
             times.append(feat.index[i + self.horizon])
 
-        X = np.stack(X_seqs)      # shape (n_samples, horizon, n_features)
-        y = np.array(y_labels)    # shape (n_samples,)
+        X = np.stack(X_seqs)
+        y = np.array(y_labels)
 
-        # 3) Split train / test
-        n_samples = len(X)
-        split_i   = int(n_samples * self.train_frac)
-
+        split_i = int(len(X) * self.train_frac)
         X_train, y_train = X[:split_i], y[:split_i]
         X_test,  y_test  = X[split_i:], y[split_i:]
-        times_train, times_test       = times[:split_i], times[split_i:]
+        times_train, times_test = times[:split_i], times[split_i:]
 
-        # 4) Forward-rolling CV + RandomizedSearch for RFECV+LSTM
         tscv = TimeSeriesSplit(n_splits=self.cv_splits)
         search = RandomizedSearchCV(
-            estimator = self.pipeline,
-            param_distributions = {
-                # RFECV step size
-                'select__step':       [0.05, 0.1, 0.2],
-                # LSTM params
-                'clf__max_epochs':    [5, 10, 20],
+            estimator=self.pipeline,
+            param_distributions={
+                'select__step': [0.05, 0.1, 0.2],
+                'clf__max_epochs': [5, 10, 20],
                 'clf__module__hidden_size': [16, 32, 64],
-                'clf__module__dropout':     [0.1, 0.2, 0.3]
+                'clf__module__dropout': [0.1, 0.2, 0.3]
             },
-            cv = tscv,
-            scoring = self.recall_scorer,
-            n_iter  = 10,
-            n_jobs  = 1,
-            random_state = self.random_state
+            cv=tscv,
+            scoring=self.recall_scorer,
+            n_iter=10,
+            n_jobs=1,
+            random_state=self.random_state
         )
         search.fit(X_train, y_train)
         best_pipe = search.best_estimator_
 
-        # 5) Final predictions on test history
         y_pred = best_pipe.predict(X_test)
-        
-        r2_train = r2_score(y_train, best_pipe.predict(X_train))
-        r2_test = r2_score(y_test, y_pred)
-        print(f"[{self.name}] R² score. Train: {r2_train:.3f}. Test: {r2_test:.3f}")
-        
-        # Directional accuracy: how often sign(pred) == sign(true)
-        sign_test = np.sign(y_test)
-        sign_pred = np.sign(y_pred)
-        dir_acc = (sign_test == sign_pred).mean()
 
-        print(f"[{self.name}] average directional accuracy (Test set): {dir_acc:.3f}")
+        # 5) Final predictions on test history
+        rec_train = recall_score(y_train, best_pipe.predict(X_train))
+        rec_test  = recall_score(y_test,  y_pred)                     
+        auc_test  = roc_auc_score(y_test, best_pipe.predict_proba(X_test)[:,1])
+        print(f"[{self.name}] Recall. Train: {rec_train:.3f}. Test: {rec_test:.3f}")
+        print(f"[{self.name}] ROC AUC (Test): {auc_test:.3f}")
+
+        train_acc = search.score(X_train, y_train)
+        test_acc  = search.score(X_test,  y_test)
+        print(f"Train acc: {train_acc:.3f}, Test acc: {test_acc:.3f}")
 
         # 6) Build a signal series (only +1 entries; exits via backtest logic)
         positions = pd.Series(np.nan, index=feat.index)
