@@ -31,28 +31,33 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
         self.arima_order = arima_order
         self.garch_p = garch_p
         self.garch_q = garch_q
-
+    
     def fit(self, X, y=None):
-        df = X.copy()
-        # df = df.asfreq('B')
-        df = df.reset_index(drop=True)
-        ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
-        self.ar_model_ = ARIMA(ret, order=self.arima_order).fit(method_kwargs={'disp': False})
-        self.garch_model_ = arch_model(ret * 100, p=self.garch_p, q=self.garch_q).fit(disp='off')
-        kf = KalmanFilter(transition_matrices=[1], observation_matrices=[1])
-        self.kf_em_ = kf.em(ret.values)
-        self.kf_trend_ = self.kf_em_.filter(ret.values)[0].flatten()
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        df = X.copy()
-        # df = df.asfreq('B')
-        df = df.reset_index(drop=True)
-        df['arima_resid'] = self.ar_model_.resid
-        fcast = self.garch_model_.forecast(horizon=1).variance.iloc[-1, 0]
-        df['garch_vol'] = np.sqrt(fcast) / 100.0
-        df['kf_trend'] = self.kf_trend_
-        return df.dropna()
+        # Compute all features _only_ on the given slice
+        df = X.copy().reset_index(drop=True)                        
+        ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)  
+
+        # ARIMA residuals on this slice
+        ar_model = ARIMA(ret, order=self.arima_order)\
+                       .fit(method_kwargs={'disp': False})          
+        df['arima_resid'] = ar_model.resid                         
+
+        # GARCH volatility forecast on this slice
+        garch = arch_model(ret * 100, p=self.garch_p, q=self.garch_q)\
+                     .fit(disp='off')                              
+        fcast = garch.forecast(horizon=1).variance.iloc[-1, 0]     
+        df['garch_vol'] = np.sqrt(fcast) / 100.0                   
+
+        # Kalman trend on this slice
+        kf = KalmanFilter(transition_matrices=[1], observation_matrices=[1])  
+        kf_em = kf.em(ret.values)                                              
+        trend = kf_em.filter(ret.values)[0].flatten()                           
+        df['kf_trend'] = trend                                                  
+
+        return df.dropna()                                            
 
 
 # ─── TechnicalTransformer unchanged except dropna removal ──────────────────────────
@@ -160,24 +165,31 @@ class LSTMEventStrategy(Strategy):
         df['event'] = (target > self.threshold).astype(int)
 
         feat = df.copy().dropna()
-        X_feat = self.feature_transform.fit_transform(feat)
-        y_feat = feat['event'].values
+        split_i = int(len(feat) * self.train_frac)                       
+        feat_train = feat.iloc[:split_i].copy()                          
+        feat_test  = feat.iloc[split_i:].copy()                          
 
-        X_seqs, y_labels, times = [], [], []
-        for i in range(len(X_feat) - self.horizon):
-            win = X_feat[i : i + self.horizon]
-            X_seqs.append(win)
-            y_labels.append(y_feat[i + self.horizon])
-            times.append(feat.index[i + self.horizon])
+        self.feature_transform.fit(feat_train)                           
+        X_train_full = self.feature_transform.transform(feat_train)      
+        X_test_full  = self.feature_transform.transform(feat_test)       
 
-        X = np.stack(X_seqs)
-        # X = X.astype(np.float32)
-        y = np.array(y_labels)
+        y_train_full = feat_train['event'].values                        
+        y_test_full  = feat_test['event'].values                         
+        times_train_full = list(feat_train.index)                        
+        times_test_full  = list(feat_test.index)                         
 
-        split_i = int(len(X) * self.train_frac)
-        X_train, y_train = X[:split_i], y[:split_i]
-        X_test,  y_test  = X[split_i:], y[split_i:]
-        times_train, times_test = times[:split_i], times[split_i:]
+        def make_sequences(X_arr, y_arr, times_arr):
+            X_seqs, y_labels, times = [], [], []
+            for i in range(len(X_arr) - self.horizon):
+                X_seqs.append(X_arr[i : i + self.horizon])
+                y_labels.append(y_arr[i + self.horizon])
+                times.append(times_arr[i + self.horizon])
+            return np.stack(X_seqs), np.array(y_labels), times
+
+        X_train, y_train, times_train = make_sequences(
+            X_train_full, y_train_full, times_train_full)             
+        X_test,  y_test,  times_test  = make_sequences(
+            X_test_full,  y_test_full,  times_test_full)              
 
         X_train = X_train.astype(np.float32)
         X_test = X_test.astype(np.float32)
