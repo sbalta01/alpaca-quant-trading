@@ -8,9 +8,9 @@ from typing import List, Tuple
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV, train_test_split
+from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
 from sklearn.feature_selection import RFECV
-from sklearn.metrics import make_scorer, recall_score, roc_auc_score, precision_score
+from sklearn.metrics import make_scorer, recall_score, roc_auc_score
 
 import torch
 import torch.nn as nn
