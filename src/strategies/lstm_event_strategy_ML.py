@@ -57,7 +57,7 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
         trend = kf_em.filter(ret.values)[0].flatten()                           
         df['kf_trend'] = trend                                                  
 
-        return df.dropna()                                            
+        return df.dropna()                            
 
 
 # ─── TechnicalTransformer unchanged except dropna removal ──────────────────────────
@@ -169,9 +169,9 @@ class LSTMEventStrategy(Strategy):
         feat_train = feat.iloc[:split_i].copy()                          
         feat_test  = feat.iloc[split_i:].copy()                          
 
-        self.feature_transform.fit(feat_train)                           
-        X_train_full = self.feature_transform.transform(feat_train)      
-        X_test_full  = self.feature_transform.transform(feat_test)       
+        self.feature_transform.fit(feat_train.drop(columns=['event']))                           
+        X_train_full = self.feature_transform.transform(feat_train.drop(columns=['event']))
+        X_test_full  = self.feature_transform.transform(feat_test.drop(columns=['event']))
 
         y_train_full = feat_train['event'].values                        
         y_test_full  = feat_test['event'].values                         
