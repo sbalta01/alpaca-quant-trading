@@ -25,7 +25,7 @@ def plot_returns(results: pd.DataFrame, results_control: pd.DataFrame, title: st
         ax.plot(grp.index, grp["cum_returns"], label=symbol)
 
     avg_return_control = results_control['cum_returns'].unstack(level='symbol').mean(axis=1) #Avg returns for all symbols with the control strategy
-    ax.plot(results_control.index.get_level_values('timestamp').unique(), avg_return_control, label ='Returns control')
+    ax.plot(results_control.index.get_level_values('timestamp').unique(), avg_return_control, label ='Returns control', color = 'k')
 
     ax.legend()
     ax.set_xlabel("Date")

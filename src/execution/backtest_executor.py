@@ -110,6 +110,7 @@ def run_backtest_strategy(
 
     if strategy.name == "XGBoostRegression":
         df = attach_factors(df, timeframe=timeframe_yahoo)
+        print('Macros fetched')
 
     # 2) Initialize and run backtest
     engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock)
