@@ -24,7 +24,7 @@ from pykalman import KalmanFilter
 from src.strategies.base_strategy import Strategy
 from src.utils.tools import sma, ema, rsi
 
-# ─── ARIMA/GARCH/Kalman now fit in .fit() to avoid data leakage ─────────────────
+# ─── ARIMA/GARCH/Kalman ────────────────────────────────────────────────────────────────────
 class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
     """Add ARIMA residuals, GARCH vol forecast & Kalman trend to your DataFrame."""
     def __init__(self, arima_order=(1,0,1), garch_p=1, garch_q=1):
@@ -35,23 +35,21 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         df = X.copy()
         ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
-        # --- Removed: fitting inside transform
-        self.ar_model_ = ARIMA(ret, order=self.arima_order).fit(method_kwargs={'disp': False})  # ADD: store ARIMA model
-        self.garch_model_ = arch_model(ret * 100, p=self.garch_p, q=self.garch_q).fit(disp='off')  # ADD: store GARCH model
+        self.ar_model_ = ARIMA(ret, order=self.arima_order).fit(method_kwargs={'disp': False})
+        self.garch_model_ = arch_model(ret * 100, p=self.garch_p, q=self.garch_q).fit(disp='off')
         kf = KalmanFilter(transition_matrices=[1], observation_matrices=[1])
-        self.kf_em_ = kf.em(ret.values)  # ADD: EM-fit Kalman
-        self.kf_trend_ = self.kf_em_.filter(ret.values)[0].flatten()  # ADD: store filtered trend
+        self.kf_em_ = kf.em(ret.values)
+        self.kf_trend_ = self.kf_em_.filter(ret.values)[0].flatten()
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         df = X.copy()
-        ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
-        # --- Removed: re-fitting models here
-        df['arima_resid'] = self.ar_model_.resid  # ADD: use stored residuals
-        fcast = self.garch_model_.forecast(horizon=1).variance.iloc[-1, 0]  # unchanged
-        df['garch_vol'] = np.sqrt(fcast) / 100.0  # unchanged
-        df['kf_trend'] = self.kf_trend_  # ADD: use stored trend
-        return df  # --- Removed: dropna here; handle missing later
+        # ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
+        df['arima_resid'] = self.ar_model_.resid
+        fcast = self.garch_model_.forecast(horizon=1).variance.iloc[-1, 0]
+        df['garch_vol'] = np.sqrt(fcast) / 100.0
+        df['kf_trend'] = self.kf_trend_
+        return df
 
 
 # ─── TechnicalTransformer unchanged except dropna removal ──────────────────────────
@@ -65,7 +63,7 @@ class TechnicalTransformer(BaseEstimator, TransformerMixin):
         df['sma5']  = sma(df['close'],  5)
         df['ema10'] = ema(df['close'], 10)
         df['rsi14'] = rsi(df['close'], 14)
-        return df  # --- Removed: dropna here
+        return df
 
 
 # ─── LSTM module unchanged ───────────────────────────────────────────────────────
@@ -204,11 +202,12 @@ class LSTMEventStrategy(Strategy):
         best_pipe = search.best_estimator_
 
         y_pred = best_pipe.predict(X_test)
+        y_prob = best_pipe.predict_proba(X_test)[:,1]
 
         # 5) Final predictions on test history
         rec_train = recall_score(y_train, best_pipe.predict(X_train))
         rec_test  = recall_score(y_test,  y_pred)                     
-        auc_test  = roc_auc_score(y_test, best_pipe.predict_proba(X_test)[:,1])
+        auc_test  = roc_auc_score(y_test, y_prob)
         print(f"[{self.name}] Recall. Train: {rec_train:.3f}. Test: {rec_test:.3f}")
         print(f"[{self.name}] ROC AUC (Test): {auc_test:.3f}")
 
