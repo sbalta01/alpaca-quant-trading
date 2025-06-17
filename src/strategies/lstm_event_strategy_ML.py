@@ -34,6 +34,8 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         df = X.copy()
+        # df = df.asfreq('B')
+        df = df.reset_index(drop=True)
         ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
         self.ar_model_ = ARIMA(ret, order=self.arima_order).fit(method_kwargs={'disp': False})
         self.garch_model_ = arch_model(ret * 100, p=self.garch_p, q=self.garch_q).fit(disp='off')
@@ -44,12 +46,13 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         df = X.copy()
-        # ret = np.log(df['close'] / df['close'].shift(1)).fillna(0)
+        # df = df.asfreq('B')
+        df = df.reset_index(drop=True)
         df['arima_resid'] = self.ar_model_.resid
         fcast = self.garch_model_.forecast(horizon=1).variance.iloc[-1, 0]
         df['garch_vol'] = np.sqrt(fcast) / 100.0
         df['kf_trend'] = self.kf_trend_
-        return df
+        return df.dropna()
 
 
 # ─── TechnicalTransformer unchanged except dropna removal ──────────────────────────
@@ -63,7 +66,7 @@ class TechnicalTransformer(BaseEstimator, TransformerMixin):
         df['sma5']  = sma(df['close'],  5)
         df['ema10'] = ema(df['close'], 10)
         df['rsi14'] = rsi(df['close'], 14)
-        return df
+        return df.dropna()
 
 
 # ─── LSTM module unchanged ───────────────────────────────────────────────────────
@@ -76,12 +79,14 @@ class LSTMClassifierModule(nn.Module):
                             batch_first=True)
         self.drop = nn.Dropout(dropout)
         self.fc   = nn.Linear(hidden_size, 1)
-        self.act  = nn.Sigmoid()
+        # self.act  = nn.Sigmoid()
 
     def forward(self, X):
         out, _ = self.lstm(X)
         h = out[:, -1, :]
-        return self.act(self.fc(self.drop(h))).squeeze()
+        h = self.drop(h)
+        # return self.act(self.fc(h)).squeeze()
+        return self.fc(h).squeeze(-1)
 
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -119,15 +124,14 @@ class LSTMEventStrategy(Strategy):
 
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        net = NeuralNetClassifier(
+        self.net = NeuralNetClassifier(
             module              = LSTMClassifierModule,
-            module__n_features  = None,
             module__hidden_size = lstm_hidden,
             module__dropout     = lstm_dropout,
             max_epochs          = 10,
             lr                  = 1e-3,
             optimizer           = Adam,
-            criterion           = nn.BCELoss,
+            criterion           = nn.BCEWithLogitsLoss,
             batch_size          = 32,
             train_split         = None,
             iterator_train__shuffle = False,
@@ -146,14 +150,7 @@ class LSTMEventStrategy(Strategy):
         ])
 
         self.pipeline = Pipeline([
-            ('select', RFECV(
-                estimator=net,
-                step=rfecv_step,
-                cv=TimeSeriesSplit(n_splits=cv_splits),
-                scoring=self.recall_scorer,
-                n_jobs=-1
-            )),
-            ('clf', net)
+            ('clf', self.net)
         ])
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -174,6 +171,7 @@ class LSTMEventStrategy(Strategy):
             times.append(feat.index[i + self.horizon])
 
         X = np.stack(X_seqs)
+        # X = X.astype(np.float32)
         y = np.array(y_labels)
 
         split_i = int(len(X) * self.train_frac)
@@ -181,11 +179,19 @@ class LSTMEventStrategy(Strategy):
         X_test,  y_test  = X[split_i:], y[split_i:]
         times_train, times_test = times[:split_i], times[split_i:]
 
+        X_train = X_train.astype(np.float32)
+        X_test = X_test.astype(np.float32)
+        y_train = y_train.astype(np.float32)
+        y_test = y_test.astype(np.float32)
+
+        n_feats = X_train.shape[2]
+        self.net.set_params(module__n_features=n_feats)
+
+        # Hyperparam search on LSTM
         tscv = TimeSeriesSplit(n_splits=self.cv_splits)
         search = RandomizedSearchCV(
             estimator=self.pipeline,
             param_distributions={
-                'select__step': [0.05, 0.1, 0.2],
                 'clf__max_epochs': [5, 10, 20],
                 'clf__module__hidden_size': [16, 32, 64],
                 'clf__module__dropout': [0.1, 0.2, 0.3]
@@ -203,11 +209,8 @@ class LSTMEventStrategy(Strategy):
         y_prob = best_pipe.predict_proba(X_test)[:,1]
 
         # 5) Final predictions on test history
-        rec_train = recall_score(y_train, best_pipe.predict(X_train))
-        rec_test  = recall_score(y_test,  y_pred)                     
         auc_test  = roc_auc_score(y_test, y_prob)
-        print(f"[{self.name}] Recall. Train: {rec_train:.3f}. Test: {rec_test:.3f}")
-        print(f"[{self.name}] ROC AUC (Test): {auc_test:.3f}")
+        print(f"ROC AUC (Test): {auc_test:.3f}")
 
         train_acc = search.score(X_train, y_train)
         test_acc  = search.score(X_test,  y_test)
@@ -234,7 +237,6 @@ class LSTMEventStrategy(Strategy):
             y_pred_series.at[t] = pred
             y_test_series.at[t] = test
             test_mask.at[t] = 1.0
-        print('Max prediction', y_pred_series.max())
         # 7) Merge signals into df
         out = df.copy()
         out["position"] = positions
