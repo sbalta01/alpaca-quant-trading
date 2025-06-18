@@ -17,7 +17,7 @@ from xgboost import XGBRegressor
 from src.utils.metrics import sharpe_scorer
 
 from src.strategies.base_strategy import Strategy
-from src.utils.tools import ema, rsi, sma
+from src.utils.tools import adx, ema, rsi, sma
 
 class XGBoostRegressionStrategy(Strategy):
     """
@@ -154,6 +154,9 @@ class XGBoostRegressionStrategy(Strategy):
         ma_tp = tp.rolling(10).mean()
         md = tp.rolling(10).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
         df['CCI10'] = (tp - ma_tp) / (0.015 * md)
+
+        # --- ADX(14) ---
+        df["adx"] = adx(df["high"], df["low"], df["close"], window=14)
 
         # --- Ichimoku Cloud ---
         # Conversion line (9), Base line (26), Leading Span A/B (26/52)
