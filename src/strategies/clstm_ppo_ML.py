@@ -13,7 +13,7 @@ class CLSTMFeatureExtractor(BaseFeaturesExtractor):
     """
     First LSTM extracts hidden features from a sequence of T raw states.
     """
-    def __init__(self, observation_space, features_dim=128, seq_len=30):
+    def __init__(self, observation_space, features_dim=512, seq_len=30):
         obs_dim = observation_space.shape[0] // seq_len
         super().__init__(observation_space, features_dim=features_dim)
         self.seq_len    = seq_len
@@ -66,6 +66,14 @@ def train_clstm_ppo(
             vf=[64, 64]          # and for the critic
         )
     )
+
+    if torch.cuda.is_available():
+        device = 'cuda'
+        print("Current device name: ", torch.cuda.get_device_name(torch.cuda.current_device()))
+    else:
+        device = 'cpu'
+        print("Current device name: ", device)
+
     model = RecurrentPPO(
         policy = MlpLstmPolicy,
         env    = env,
@@ -78,6 +86,7 @@ def train_clstm_ppo(
         ent_coef        = 0.01,
         vf_coef         = 0.5,
         max_grad_norm   = 0.5,
+        device   = device,
         policy_kwargs   = policy_kwargs,
         tensorboard_log="./tensorboard/"
      )

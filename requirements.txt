@@ -10,6 +10,7 @@ statsmodels
 xgboost
 pandas_datareader
 torch
+# torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 git+https://github.com/skorch-dev/skorch.git
 arch
 pykalman
