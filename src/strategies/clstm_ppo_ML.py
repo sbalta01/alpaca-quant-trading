@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from sb3_contrib import RecurrentPPO
@@ -13,7 +15,7 @@ class CLSTMFeatureExtractor(BaseFeaturesExtractor):
     """
     First LSTM extracts hidden features from a sequence of T raw states.
     """
-    def __init__(self, observation_space, features_dim=512, seq_len=30):
+    def __init__(self, observation_space, features_dim, seq_len=30):
         obs_dim = observation_space.shape[0] // seq_len
         super().__init__(observation_space, features_dim=features_dim)
         self.seq_len    = seq_len
@@ -51,19 +53,20 @@ def train_clstm_ppo(
     df = price_df
     env_kwargs = dict(
         price_df=df, tech_cols=tech_cols, macro_cols=macro_cols,
-        initial_cash=1e6, transaction_cost=0.001,
+        initial_cash=1e3, transaction_cost=0.001,
         turbulence_col="turbulence", turbulence_percentile=0.9
     )
+    features_dim = len(df.index.get_level_values(level='symbol').unique())*len(tech_cols) + len(macro_cols)
     env = make_vec_env(env_kwargs, n_envs, seq_len)
 
     # 2) Recurrent PPO hyperparams (two LSTMs: your extractor + internal LSTM)
     policy_kwargs = dict(
         features_extractor_class = CLSTMFeatureExtractor,
-        features_extractor_kwargs = dict(seq_len=seq_len, features_dim=lstm_hidden),
-        lstm_hidden_size  = lstm_hidden,
+        features_extractor_kwargs = dict(seq_len=seq_len, features_dim=features_dim),
+        lstm_hidden_size  = lstm_hidden, #hidden size for PPO's LSTM
         net_arch=dict(
-            pi=[64, 64],         # two hidden layers of size 64 for the actor
-            vf=[64, 64]          # and for the critic
+            pi=[lstm_hidden],         # One hidden layers of size lstm_hidden for the actor
+            vf=[lstm_hidden]          # and for the critic
         )
     )
 
@@ -90,7 +93,7 @@ def train_clstm_ppo(
         policy_kwargs   = policy_kwargs,
         tensorboard_log="./tensorboard/"
      )
-
+            
     # 3) train
     model.learn(total_timesteps=total_timesteps, progress_bar= True)
     return model

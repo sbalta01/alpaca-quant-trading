@@ -86,15 +86,18 @@ if __name__ == "__main__":
     df = attach_factors(df, timeframe=timeframe_yahoo)
     df = add_technicals(df)
 
-    tech_cols  = ["macd","rsi","cci","adx"]
-    macro_cols = ["VIX","EURUSD"]
+    tech_cols  = ["close","macd","rsi","cci","adx"]
+    macro_cols = ["VIX","EURUSD", "DFF"]
+
+    features_dim = len(df.index.get_level_values(level='symbol').unique())*len(tech_cols) + len(macro_cols)
+    lstm_hidden = features_dim*4
 
     model = train_clstm_ppo(
         price_df = df,
         tech_cols=tech_cols,
         macro_cols=macro_cols,
         seq_len      = 30,
-        lstm_hidden  = 512,
+        lstm_hidden  = lstm_hidden,
         total_timesteps=500_000,
         n_envs         = 1
     )
