@@ -24,7 +24,6 @@ def add_technicals(df: pd.DataFrame) -> pd.DataFrame:
         ma_tp = tp.rolling(20).mean()
         md    = tp.rolling(20).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
         g["cci"] = (tp - ma_tp) / (0.015 * md)
-        # ADX(14) – you can implement it in src/utils/indicators.py
         g["adx"] = adx(g["high"], g["low"], g["close"], window=14)
 
         g["symbol"]    = sym
@@ -98,7 +97,7 @@ if __name__ == "__main__":
         macro_cols=macro_cols,
         seq_len      = 30,
         lstm_hidden  = lstm_hidden,
-        total_timesteps=500_000,
+        total_timesteps=5000,
         n_envs         = 1
     )
 

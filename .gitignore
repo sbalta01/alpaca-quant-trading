@@ -4,3 +4,4 @@ Secret key.txt
 config.py
 __pycache__/
 tensorboard/
+clstm_ppo_stock.zip
