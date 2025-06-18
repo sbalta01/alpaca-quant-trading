@@ -13,3 +13,9 @@ torch
 git+https://github.com/skorch-dev/skorch.git
 arch
 pykalman
+gymnasium
+stable-baselines3
+tensorboard
+sb3-contrib
+tqdm
+rich
