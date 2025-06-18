@@ -30,6 +30,97 @@ def rsi(series: pd.Series, window: int = 14) -> pd.Series:
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+def adx(high: pd.Series, low: pd.Series, close: pd.Series, window: int = 14) -> pd.Series:
+    """
+    Average Directional Index (ADX) via Wilder's smoothing.
+
+    Parameters
+    ----------
+    high, low, close : pd.Series
+        series of highs, lows, closes
+    window : int
+        lookback period (typically 14)
+
+    Returns
+    -------
+    pd.Series
+        ADX values, aligned with `close` index.
+    """
+    # 1) True Range (TR)
+    tr1 = high - low
+    tr2 = (high - close.shift()).abs()
+    tr3 = (low  - close.shift()).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+    # 2) Directional Movement
+    up_move   = high.diff()
+    down_move = -low.diff()
+
+    plus_dm  = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+
+    plus_dm  = pd.Series(plus_dm,  index=high.index)
+    minus_dm = pd.Series(minus_dm, index=high.index)
+
+    # 3) Wilder’s smoothing (EMA with alpha=1/window, adjust=False)
+    atr       = tr.ewm(alpha=1/window, adjust=False).mean()
+    plus_di   = 100 * plus_dm.ewm(alpha=1/window, adjust=False).mean() / atr
+    minus_di  = 100 * minus_dm.ewm(alpha=1/window, adjust=False).mean() / atr
+
+    # 4) DX and ADX
+    dx  = (plus_di - minus_di).abs() / (plus_di + minus_di) * 100
+    adx = dx.ewm(alpha=1/window, adjust=False).mean()
+
+    return adx
+
+import pandas as pd
+import numpy as np
+
+def compute_turbulence(
+    df: pd.DataFrame,
+    window: int = 252
+) -> pd.Series:
+    """
+    Compute a turbulence index as the Mahalanobis distance of each day's
+    cross-section of returns from the rolling-window historical mean.
+
+    Parameters
+    ----------
+    df : MultiIndex DataFrame [symbol,timestamp] with 'close'
+    window : int
+        Lookback window in trading days for mean/cov estimation.
+
+    Returns
+    -------
+    pd.Series
+        Indexed by timestamp, turbulence values.
+    """
+    # 1) Pivot to wide: rows=timestamp, cols=symbol
+    prices = df["close"].unstack(level="symbol")
+    # 2) Compute daily returns
+    rets = prices.pct_change().dropna(how="all")
+    dates = rets.index
+
+    tur_vals = []
+    # Precompute nothing for the first `window` days
+    for i, date in enumerate(dates):
+        if i < window:
+            tur_vals.append(0.0)
+        else:
+            window_rets = rets.iloc[i-window : i]
+            mu  = window_rets.mean()
+            cov = window_rets.cov().values
+            x   = rets.iloc[i].values
+            # Mahalanobis distance: (x-mu).T @ inv(cov) @ (x-mu)
+            # use pseudoinverse for stability
+            delta = x - mu.values
+            inv_cov = np.linalg.pinv(cov)
+            dist = float(delta @ inv_cov @ delta)
+            tur_vals.append(dist)
+
+    turbulence = pd.Series(tur_vals, index=dates, name="turbulence")
+    return turbulence
+
 def remove_outliers(df: pd.DataFrame, ratio_outliers: float = np.inf) -> pd.DataFrame:
     """Drop rows where any feature is outside ratio*IQR."""
     if ratio_outliers == np.inf:
