@@ -2,14 +2,11 @@
 
 import numpy as np
 import pandas as pd
-from datetime import datetime
-from typing import List, Tuple
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
-from sklearn.feature_selection import RFECV
 from sklearn.metrics import make_scorer, recall_score, roc_auc_score
 
 import torch
@@ -52,7 +49,7 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
         df['garch_vol'] = np.sqrt(fcast) / 100.0                   
 
         # Kalman trend on this slice
-        kf = KalmanFilter(transition_matrices=[1], observation_matrices=[1])  
+        kf = KalmanFilter(transition_matrices=np.array([[1]]), observation_matrices=np.array([[1]]))  
         kf_em = kf.em(ret.values)                                              
         trend = kf_em.filter(ret.values)[0].flatten()                           
         df['kf_trend'] = trend                                                  
@@ -126,7 +123,12 @@ class LSTMEventStrategy(Strategy):
 
         self.recall_scorer = make_scorer(recall_score)
 
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        if torch.cuda.is_available():
+            device = 'cuda'
+            print("Current device name: ", torch.cuda.get_device_name(torch.cuda.current_device()))
+        else:
+            device = 'cpu'
+            print("Current device name: ", device)
 
         self.net = NeuralNetClassifier(
             module              = LSTMClassifierModule,
@@ -211,7 +213,8 @@ class LSTMEventStrategy(Strategy):
             scoring=self.recall_scorer,
             n_iter=10,
             n_jobs=1,
-            random_state=self.random_state
+            # verbose=2,
+            random_state=self.random_state,
         )
         search.fit(X_train, y_train)
         best_pipe = search.best_estimator_
