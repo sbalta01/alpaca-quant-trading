@@ -121,6 +121,10 @@ class LSTMEventStrategy(Strategy):
         self.random_state = random_state
         self.train_frac = train_frac
 
+        # Reproducibility
+        np.random.seed(self.random_state)
+        torch.manual_seed(self.random_state)
+
         self.recall_scorer = make_scorer(recall_score)
 
         if torch.cuda.is_available():
@@ -212,7 +216,7 @@ class LSTMEventStrategy(Strategy):
             cv=tscv,
             scoring=self.recall_scorer,
             n_iter=10,
-            n_jobs=1,
+            n_jobs=-1,
             # verbose=2,
             random_state=self.random_state,
         )
