@@ -129,28 +129,28 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    # strat = XGBoostRegressionStrategy(
-    #     horizon = 10,
-    #     train_frac = 0.7,
-    #     cv_splits = 5,
-    #     rfecv_step = 0.1,
-    #     pca_n_components = 25,
-    #     use_pca = False,
-    #     # param_grid = {
-    #     #     'model__n_estimators': [50, 100, 200],
-    #     #     'model__max_depth':    [3, 5, 7],
-    #     #     'model__learning_rate': [0.01, 0.1, 0.2],
-    #     #     'model__subsample':    [0.7, 1.0],
-    #     # },
-    #     # signal_thresh = 0.05,
-    #     n_iter_search = 50
-    # )
-
-    strat = LSTMEventStrategy(
-        horizon=20,        # predict horizon-day return
-        threshold=0.05,   # event = next-horizon-day log-return > threshold%
+    strat = XGBoostRegressionStrategy(
+        horizon = 10,
         train_frac = 0.7,
+        cv_splits = 5,
+        rfecv_step = 0.1,
+        pca_n_components = 25,
+        use_pca = False,
+        # param_grid = {
+        #     'model__n_estimators': [50, 100, 200],
+        #     'model__max_depth':    [3, 5, 7],
+        #     'model__learning_rate': [0.01, 0.1, 0.2],
+        #     'model__subsample':    [0.7, 1.0],
+        # },
+        signal_thresh = 0.05,
+        n_iter_search = 50
     )
+
+    # strat = LSTMEventStrategy(
+    #     horizon=20,        # predict horizon-day return
+    #     threshold=0.05,   # event = next-horizon-day log-return > threshold%
+    #     train_frac = 0.7,
+    # )
 
     start_backtest = time.perf_counter()
 
