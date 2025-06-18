@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # )
 
     # strat = XGBoostRegressionStrategy(
-    #     horizon = 20,
+    #     horizon = 10,
     #     train_frac = 0.7,
     #     cv_splits = 5,
     #     rfecv_step = 0.1,
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     #     #     'model__learning_rate': [0.01, 0.1, 0.2],
     #     #     'model__subsample':    [0.7, 1.0],
     #     # },
-    #     signal_thresh = 0.05,
+    #     # signal_thresh = 0.05,
     #     n_iter_search = 50
     # )
 
