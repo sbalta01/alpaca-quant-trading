@@ -3,3 +3,4 @@ Secret key.txt
 .venv
 config.py
 __pycache__/
+tensorboard/
