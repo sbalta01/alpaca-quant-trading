@@ -20,3 +20,4 @@ tensorboard
 sb3-contrib
 tqdm
 rich
+optuna

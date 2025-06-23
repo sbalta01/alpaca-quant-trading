@@ -98,7 +98,8 @@ def compute_turbulence(
     # 1) Pivot to wide: rows=timestamp, cols=symbol
     prices = df["close"].unstack(level="symbol")
     # 2) Compute daily returns
-    rets = prices.pct_change().dropna(how="all")
+    # rets = prices.pct_change().dropna(how="all")
+    rets = np.log(df['close'] / df['close'].shift(1)).dropna()
     dates = rets.index
 
     tur_vals = []

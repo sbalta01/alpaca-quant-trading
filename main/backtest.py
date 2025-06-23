@@ -8,6 +8,7 @@ from src.data.data_loader import fetch_nasdaq_100_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
 from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
 from src.strategies.lstm_event_arima_garch_ML import LSTMEventStrategy
+from src.strategies.lstm_event_technical_ML import LSTMEventTechnicalStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_returns, plot_signals
@@ -45,7 +46,7 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2016, 10, 1)
+    start   = datetime(2023, 10, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 1)
@@ -146,11 +147,18 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    strat = LSTMEventStrategy(
+    # strat = LSTMEventStrategy(
+    #     horizon=20,        # predict horizon-day return
+    #     threshold=0.05,   # event = next-horizon-day log-return > threshold%
+    #     train_frac = 0.7,
+    #     arima_garch_kalman_window = 252,
+    #     random_state=41
+    # )
+
+    strat = LSTMEventTechnicalStrategy(
         horizon=20,        # predict horizon-day return
         threshold=0.05,   # event = next-horizon-day log-return > threshold%
         train_frac = 0.7,
-        arima_garch_kalman_window = 252,
         random_state=41
     )
 
