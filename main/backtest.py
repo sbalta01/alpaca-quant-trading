@@ -7,7 +7,7 @@ import pandas as pd
 from src.data.data_loader import fetch_nasdaq_100_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
 from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
-from src.strategies.lstm_event_strategy_arima_garch_ML import LSTMEventStrategy
+from src.strategies.lstm_event_arima_garch_ML import LSTMEventStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_returns, plot_signals
