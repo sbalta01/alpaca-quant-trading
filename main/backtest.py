@@ -23,12 +23,12 @@ from src.strategies.xgboost_regression_ML import XGBoostRegressionStrategy
 if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
-    symbols = ["SPY"]
+    # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
-    # symbols = ["IDR.MC"]
+    symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
     # symbols = ["HAG.DE","RHM.DE","IDR.MC","ECR.MC"]
@@ -150,6 +150,8 @@ if __name__ == "__main__":
         horizon=20,        # predict horizon-day return
         threshold=0.05,   # event = next-horizon-day log-return > threshold%
         train_frac = 0.7,
+        arima_garch_kalman_window = 252,
+        random_state=41
     )
 
     start_backtest = time.perf_counter()
