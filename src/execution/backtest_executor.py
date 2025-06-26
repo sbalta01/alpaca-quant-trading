@@ -58,6 +58,13 @@ def run_backtest_strategy(
     try:
         from src.data.data_loader import fetch_alpaca_data as fetch_data
         jkandc
+        df = fetch_data(
+        symbol=symbols,
+        start=start,
+        end=end,
+        timeframe=timeframe,
+        feed = feed
+        )
         print('USING ALPACA DATA')
     except:
         from src.data.data_loader import fetch_yahoo_data as fetch_data
