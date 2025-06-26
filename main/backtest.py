@@ -25,11 +25,13 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    # symbols = ["MSFT"]
+    symbols = ["ROP"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
-    symbols = ["IDR.MC"]
+    # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
     # symbols = ["HAG.DE","RHM.DE","IDR.MC","ECR.MC"]
@@ -46,10 +48,10 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2023, 10, 1)
+    start   = datetime(2015, 10, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
-    # end     = datetime(2025, 1, 1)
+    # end     = datetime(2025, 1, 8)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
@@ -159,7 +161,7 @@ if __name__ == "__main__":
         horizon=20,        # predict horizon-day return
         threshold=0.05,   # event = next-horizon-day log-return > threshold%
         train_frac = 0.7,
-        random_state=41
+        random_state=43
     )
 
     start_backtest = time.perf_counter()
