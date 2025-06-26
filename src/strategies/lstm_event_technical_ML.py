@@ -14,24 +14,51 @@ from skorch import NeuralNetClassifier
 from torch.optim import Adam
 
 from src.strategies.base_strategy import Strategy
-from src.utils.tools import adx, compute_turbulence, sma, ema, rsi
+from src.utils.tools import adx, compute_turbulence_single_symbol, sma, ema, rsi
 
-# ─── LSTM module ───────────────────────────────────────────────────────
-class LSTMClassifierModule(nn.Module):
-    """Simple 1-layer LSTM → Dropout → Dense(sigmoid) classifier."""
+class FeatureAttention(nn.Module):
+    """
+    Learns a per-feature attention weight vector for each time step.
+    Input:  X of shape (batch, seq_len, n_features)
+    Output: X_att of same shape, where X_att[:,:,i] = alpha_i · X[:,:,i]
+    """
+    def __init__(self, n_features: int):
+        super().__init__()
+        # one scalar score per feature
+        self.score = nn.Parameter(torch.zeros(n_features))
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        # X: [B, T, F]
+        # produce a normalized weight vector α of shape [F]
+        alpha = self.softmax(self.score)
+        # broadcast to [B, T, F]
+        return X * alpha
+
+class LSTMWithFeatureAttention(nn.Module):
+    """Simple 1-layer LSTM → Dropout → Dense(sigmoid) classifier with
+    feature-level attention before the LSTM.
+    """
     def __init__(self, n_features, hidden_size=32, dropout=0.2):
         super().__init__()
-        self.lstm = nn.LSTM(input_size=n_features,
-                            hidden_size=hidden_size,
-                            batch_first=True)
-        self.drop = nn.Dropout(dropout)
-        self.fc   = nn.Linear(hidden_size, 1)
+        self.attn   = FeatureAttention(n_features)
+        self.lstm   = nn.LSTM(input_size=n_features,
+                              hidden_size=hidden_size,
+                              batch_first=True)
+        self.drop   = nn.Dropout(dropout)
+        self.output = nn.Linear(hidden_size, 1)
 
     def forward(self, X):
-        out, _ = self.lstm(X)
-        h = out[:, -1, :]
+        # 1) apply feature attention
+        X = self.attn(X)                   # [B, T, F] → weighted
+
+        # 2) run through the LSTM
+        out, _ = self.lstm(X)              # out: [B, T, hidden]
+
+        # 3) classify off the final hidden state
+        h = out[:, -1, :]                  # [B, hidden]
         h = self.drop(h)
-        return self.fc(h).squeeze(-1)
+        return self.output(h).squeeze(-1)
 
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -77,8 +104,6 @@ class LSTMEventTechnicalStrategy(Strategy):
         threshold: float = 0.02,
         train_frac = 0.7,
         cv_splits: int = 5,
-        # lstm_hidden: int = 32,
-        # lstm_dropout: float = 0.2,
         random_state: int = 42
     ):
         self.horizon   = horizon
@@ -99,7 +124,7 @@ class LSTMEventTechnicalStrategy(Strategy):
             print("Current device name: ", device)
 
         self.net = NeuralNetClassifier(
-            module              = LSTMClassifierModule,
+            module              = LSTMWithFeatureAttention,
             max_epochs          = 10,
             lr                  = 1e-3,
             optimizer           = Adam,
@@ -118,6 +143,14 @@ class LSTMEventTechnicalStrategy(Strategy):
         
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
+        idx = df.index
+
+        # --- Calendar data with cyclical embedding
+        df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
+        df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
+        df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
+        df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
+
         # --- Price & lag features ---
         df['open'] = df['open']
         df['high'] = df['high']
@@ -187,7 +220,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         high52 = df['high'].rolling(52).max()
         low52  = df['low'].rolling(52).min()
         df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
-        # df['turbulence'] = compute_turbulence(df, window=252)
+        df['turbulence'] = compute_turbulence_single_symbol(df, window=252)
         return df.dropna()
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
