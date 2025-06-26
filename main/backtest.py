@@ -25,12 +25,13 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["MSFT"]
-    symbols = ["ROP"]
+    # symbols = ["ROP"]
     # symbols = ["AAPL","MSFT"]
+    # symbols = ["PFE"]
     # symbols = ["HAG.DE"]
-    # symbols = ["RHM.DE"]
+    symbols = ["RHM.DE"]
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2015, 10, 1)
+    start   = datetime(2020, 10, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 8)
@@ -161,7 +162,7 @@ if __name__ == "__main__":
         horizon=20,        # predict horizon-day return
         threshold=0.05,   # event = next-horizon-day log-return > threshold%
         train_frac = 0.7,
-        random_state=43
+        random_state=42
     )
 
     start_backtest = time.perf_counter()
