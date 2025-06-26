@@ -73,9 +73,6 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series, window: int = 14) -> 
 
     return adx
 
-import pandas as pd
-import numpy as np
-
 def compute_turbulence(
     df: pd.DataFrame,
     window: int = 252
