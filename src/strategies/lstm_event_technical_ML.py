@@ -1,15 +1,12 @@
 # src/strategies/lstm_event_strategy.py
 
-from itertools import product
 import numpy as np
 import pandas as pd
-import optuna
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
-from sklearn.metrics import make_scorer, recall_score, roc_auc_score
+from sklearn.metrics import roc_auc_score
 
 import torch
 import torch.nn as nn
@@ -90,11 +87,9 @@ class LSTMEventTechnicalStrategy(Strategy):
         self.random_state = random_state
         self.train_frac = train_frac
 
-        # # Reproducibility
-        # np.random.seed(self.random_state)
-        # torch.manual_seed(self.random_state)
-
-        self.recall_scorer = make_scorer(recall_score)
+        # Reproducibility
+        np.random.seed(self.random_state)
+        torch.manual_seed(self.random_state)
 
         if torch.cuda.is_available() and False: #Disabled
             device = 'cuda'
@@ -105,8 +100,6 @@ class LSTMEventTechnicalStrategy(Strategy):
 
         self.net = NeuralNetClassifier(
             module              = LSTMClassifierModule,
-            # module__hidden_size = lstm_hidden,
-            # module__dropout     = lstm_dropout,
             max_epochs          = 10,
             lr                  = 1e-3,
             optimizer           = Adam,
@@ -122,11 +115,6 @@ class LSTMEventTechnicalStrategy(Strategy):
             ('scale', TimeSeriesScaler(StandardScaler())),
             ('clf', self.net)
         ])
-
-        # self.pipeline = Pipeline([
-        #     ('scale', StandardScaler()),
-        #     ('clf', self.net)
-        # ])
         
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
@@ -242,26 +230,20 @@ class LSTMEventTechnicalStrategy(Strategy):
         y_test = y_test.astype(np.float32)
 
         n_feats = X_train.shape[2]
-        self.net.set_params(module__n_features=n_feats)
-
-        # Hyperparam search on LSTM
-        tscv = TimeSeriesSplit(n_splits=self.cv_splits)
-        search = RandomizedSearchCV(
-            estimator=self.pipeline,
-            param_distributions={
-                'clf__max_epochs': [5, 10, 20],
-                'clf__module__hidden_size': [16, 32, 64],
-                'clf__module__dropout': [0.1, 0.2, 0.3]
-            },
-            cv=tscv,
-            scoring=self.recall_scorer,
-            n_iter=10,
-            n_jobs=1,
-            # verbose=2,
-            random_state=self.random_state,
-        )
+        search = self.pipeline
+        search.set_params(clf__module__n_features=n_feats,
+                          clf__module__hidden_size=n_feats,
+                          clf__module__dropout     = 0.1,
+                          )
+        
+        
+        # from torch import tensor
+        # ratio = (len(y_train) - y_train.sum()) / y_train.sum() #Negative/Positive
+        # pos_weight = tensor([ratio])
+        # self.net.set_params(criterion__pos_weight=pos_weight)
+        
         search.fit(X_train, y_train)
-        best_pipe = search.best_estimator_
+        best_pipe = search
 
         y_pred = best_pipe.predict(X_test)
         y_prob = best_pipe.predict_proba(X_test)[:,1]
@@ -272,7 +254,7 @@ class LSTMEventTechnicalStrategy(Strategy):
 
         train_acc = search.score(X_train, y_train)
         test_acc  = search.score(X_test,  y_test)
-        print(f"Train recall: {train_acc:.3f}, Test recall: {test_acc:.3f}")
+        print(f"Train score: {train_acc:.3f}, Test score: {test_acc:.3f}")
 
         # 6) Build a signal series
         positions = pd.Series(np.nan, index=df.index)
@@ -282,14 +264,18 @@ class LSTMEventTechnicalStrategy(Strategy):
         test_mask = pd.Series(0.0, index=df.index)
         position = 0
         days_left = 0
-        for t, pred, test in zip(times_test, y_pred, y_test):
+        prob_threshold = 0.5
+        for t, pred, prob, test in zip(times_test, y_pred, y_prob, y_test):
+            # print(pred)
             if days_left > 0:
                 days_left -= 1
+                if prob >= prob_threshold:
+                    days_left += 1
             else:
-                if position == 0 and pred == 1:
+                if position == 0 and prob >= prob_threshold:
                     position = 1
                     days_left = self.horizon - 1
-                elif position == 1 and pred == 0.0:
+                elif position == 1 and prob < prob_threshold:
                     position = 0 #exit to flat
             positions.at[t] = position
             y_pred_series.at[t] = pred
