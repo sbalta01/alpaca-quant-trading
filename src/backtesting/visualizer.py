@@ -79,9 +79,9 @@ def plot_signals(
         flat_2 = flat[flat[signal_col] == 1.0]
         short = df[df[signal_col] == -1.0]
         short = short[short[position_col] ==  -1.0]
-        ax.scatter(long.index,  long[price_col], marker="^", color = "olive", label=f"{label} Long" if label else "Long",  s=50)
-        ax.scatter(short.index, short[price_col], marker="v", color = "darkslategrey",label=f"{label} Short" if label else "Short", s=50)
-        ax.scatter(flat_1.index, flat_1[price_col], marker="o", color = "darkslategrey",label=f"{label} Flat" if label else "Flat", s=50)
+        ax.scatter(long.index,  long[price_col], marker="^", color = "olive",  s=50)
+        ax.scatter(short.index, short[price_col], marker="v", color = "darkslategrey", s=50)
+        ax.scatter(flat_1.index, flat_1[price_col], marker="o", color = "darkslategrey", s=50)
         ax.scatter(flat_2.index, flat_2[price_col], marker="o", color = "darkslategrey", s=50)
 
     for symbol, grp in results.groupby(level="symbol"):
