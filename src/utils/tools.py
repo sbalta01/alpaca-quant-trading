@@ -119,6 +119,51 @@ def compute_turbulence(
     turbulence = pd.Series(tur_vals, index=dates, name="turbulence")
     return turbulence
 
+def compute_turbulence_single_symbol(
+    df: pd.DataFrame,
+    window: int = 252
+) -> pd.Series:
+    """
+    Compute a (1D) turbulence index for a single symbol as the squared
+    deviation of each day's log-return from its rolling-window mean,
+    normalized by the rolling-window variance.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Single-index DataFrame (index name 'timestamp') with a 'close' column.
+    window : int
+        Lookback window (in bars) for mean/variance estimation.
+
+    Returns
+    -------
+    pd.Series
+        Indexed by timestamp, turbulence values.
+    """
+    # 1) Compute log returns
+    rets = np.log(df['close'] / df['close'].shift(1)).dropna()
+    dates = rets.index
+
+    tur_vals = []
+    # 2) For each date, compute 1D Mahalanobis distance:
+    #    (r - μ)^2 / σ^2  over the prior `window` returns.
+    for i, date in enumerate(dates):
+        if i < window:
+            tur_vals.append(0.0)
+        else:
+            window_rets = rets.iloc[i - window : i]
+            mu  = window_rets.mean()
+            var = window_rets.var(ddof=1)
+            delta = float(rets.iloc[i] - mu)
+            # guard against zero variance
+            if var > 0:
+                dist = (delta * delta) / var
+            else:
+                dist = 0.0
+            tur_vals.append(dist)
+
+    return pd.Series(tur_vals, index=dates, name="turbulence")
+
 def remove_outliers(df: pd.DataFrame, ratio_outliers: float = np.inf) -> pd.DataFrame:
     """Drop rows where any feature is outside ratio*IQR."""
     if ratio_outliers == np.inf:
