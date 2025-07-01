@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import make_scorer, precision_score, recall_score, roc_auc_score
@@ -199,6 +199,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         threshold: float = 0.02,
         train_frac = 0.7,
         cv_splits: int = 5,
+        n_models: int = 1,
         random_state: int = 42,
         sequences_length: int = None,
         prob_positive_threshold: float = 0.5,
@@ -209,6 +210,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         self.horizon   = horizon
         self.threshold = np.log(1 + threshold)
         self.cv_splits = cv_splits
+        self.n_models = n_models
         self.random_state = random_state
         self.train_frac = train_frac
         self.sequences_length = sequences_length if sequences_length is not None else horizon
@@ -235,18 +237,12 @@ class LSTMEventTechnicalStrategy(Strategy):
         # df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
 
         # --- Price & lag features ---
-        df['open'] = df['open']
-        df['high'] = df['high']
-        df['low']  = df['low']
-        df['close'] = df['close']
-
         df['logret'] = np.log(df['close'] / df['close'].shift(1))
         df[f'vol{self.horizon}'] = df['logret'].rolling(self.horizon).std()
         df[f'logret{self.horizon}'] = np.log(df['close'] / df['close'].shift(self.horizon))
 
 
         # --- Volume features ---
-        df['volume'] = df['volume']
         df['volume_1'] = df['volume'].shift(1)
         df['volume_inc'] = df['volume'] - df['volume_1']
 
@@ -402,7 +398,8 @@ class LSTMEventTechnicalStrategy(Strategy):
         feat = feat.dropna()  #This order (1st event, then features, then dropping na) prevents any misalignment
 
         # 3) Split train / test
-        X = feat.drop(columns=['event']) #No data leakage
+        X = feat.drop(columns=['event']) #Remove data leakage
+        # X = feat.drop(columns=['event','open','high','low','close','volume'])
         y = feat['event']
 
         split_index = int(len(feat) * self.train_frac)
@@ -433,10 +430,6 @@ class LSTMEventTechnicalStrategy(Strategy):
         y_test = y_test.astype(np.float32)
 
         n_feats = X_train.shape[2]
-
-        # Reproducibility
-        np.random.seed(self.random_state)
-        torch.manual_seed(self.random_state)
 
         if self.with_hyperparam_fit:
             best_params = self.hyperparameter_fit(X_train, y_train)
@@ -485,20 +478,35 @@ class LSTMEventTechnicalStrategy(Strategy):
             ('scale', TimeSeriesScaler(StandardScaler())),
             ('clf', self.net)
         ])
-        search = self.pipeline
 
-        search.fit(X_train, y_train)
+        all_probs = []
+        all_probs_train = []
+        for i in range(self.n_models):
+            # 1) clone a fresh pipeline
+            pipe = clone(self.pipeline)
+            # 2) reseed any RNGs
+            seed = self.random_state + i
+            np.random.seed(seed)
+            torch.manual_seed(seed)
 
-        y_pred = search.predict(X_test)
-        y_prob = search.predict_proba(X_test)[:,1]
+            # 3) fit on the same training data
+            pipe.fit(X_train, y_train)
+
+            # 4) predict proba on X_test and collect P(y=1)
+            y_prob1 = pipe.predict_proba(X_test)[:, 1]
+            y_prob_train1 = pipe.predict_proba(X_train)[:, 1]
+            all_probs.append(y_prob1)
+            all_probs_train.append(y_prob_train1)
+
+        # 5) stack (n_models, n_test) → mean across models → shape (n_test,)
+        y_prob = np.stack(all_probs, axis=0).mean(axis=0)
+        y_prob_train = np.stack(all_probs_train, axis=0).mean(axis=0)
+        y_pred = (y_prob >= 0.5).astype(int)
 
         # 5) Final predictions on test history
+        auc_train  = roc_auc_score(y_train, y_prob_train)
         auc_test  = roc_auc_score(y_test, y_prob)
-        print(f"ROC AUC (Test): {auc_test:.3f}")
-
-        train_acc = search.score(X_train, y_train)
-        test_acc  = search.score(X_test,  y_test)
-        print(f"Train score: {train_acc:.3f}, Test score: {test_acc:.3f}")
+        print(f"ROC AUC (Train): {auc_train:.3f}, ROC AUC (Test): {auc_test:.3f}")
 
         # 6) Build a signal series
         positions = pd.Series(np.nan, index=df.index)
