@@ -31,7 +31,8 @@ if __name__ == "__main__":
     # symbols = ["AAPL","MSFT"]
     # symbols = ["PFE"]
     # symbols = ["HAG.DE"]
-    symbols = ["RHM.DE"]
+    # symbols = ["RHM.DE"]
+    # symbols = ["MRK"]
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
@@ -47,9 +48,9 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    # symbols = fetch_nasdaq_100_symbols()
+    symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2020, 10, 1)
+    start   = datetime(2010, 10, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 1, 8)
@@ -161,8 +162,14 @@ if __name__ == "__main__":
     strat = LSTMEventTechnicalStrategy(
         horizon=20,        # predict horizon-day return
         threshold=0.05,   # event = next-horizon-day log-return > threshold%
-        train_frac = 0.7,
-        random_state=42
+        train_frac = 0.5,
+        cv_splits = 2,
+        random_state=42,
+        # sequences_length = 20,
+        prob_positive_threshold = 0.7,
+        with_hyperparam_fit = False,
+        with_feature_attn = False,
+        with_pos_weight = True,
     )
 
     start_backtest = time.perf_counter()
