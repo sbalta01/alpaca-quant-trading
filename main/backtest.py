@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # symbols = ["PFE"]
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
-    # symbols = ["MRK"]
+    symbols = ["MRK"]
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    symbols = fetch_nasdaq_100_symbols()
+    # symbols = fetch_nasdaq_100_symbols()
 
     start   = datetime(2010, 10, 1)
     # start   = datetime(2025, 1, 5)
@@ -164,9 +164,10 @@ if __name__ == "__main__":
         threshold=0.05,   # event = next-horizon-day log-return > threshold%
         train_frac = 0.5,
         cv_splits = 2,
+        n_models = 1,
         random_state=42,
         # sequences_length = 20,
-        prob_positive_threshold = 0.7,
+        prob_positive_threshold = 0.5,
         with_hyperparam_fit = False,
         with_feature_attn = False,
         with_pos_weight = True,
