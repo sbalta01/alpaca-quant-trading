@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from sklearn.base import BaseEstimator, TransformerMixin, clone
+from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin, clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import make_scorer, precision_score, recall_score, roc_auc_score
@@ -16,8 +16,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from skorch import NeuralNetClassifier
+from skorch.callbacks import LRScheduler
 import optuna
 from torch import tensor
+import io
+from contextlib import redirect_stdout, redirect_stderr
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 logging.getLogger("optuna").setLevel(logging.WARNING)
@@ -97,12 +100,18 @@ class AttentionLSTMClassifier(nn.Module):
     def __init__(self, n_features, with_feature_attn: bool, hidden_size=128, dropout=0.2, attn_dim = 64,):
         super().__init__()
         self.feat_attn = DynamicFeatureAttention(n_features, attn_dim=attn_dim)
-        self.lstm      = nn.LSTM(input_size=n_features,
-                                  hidden_size=hidden_size,
-                                  batch_first=True)
-        self.temp_attn = TemporalAttention(hidden_size, attn_dim=attn_dim)
+        self.lstm      = nn.LSTM(
+                                input_size=n_features,
+                                hidden_size=hidden_size,
+                                num_layers  = 2,           # two stacked layers #New
+                                bidirectional = True,      # bidirectional #New
+                                batch_first=True
+                                )
+        # self.temp_attn = TemporalAttention(hidden_size, attn_dim=attn_dim)
+        self.temp_attn = TemporalAttention(hidden_size * 2, attn_dim=attn_dim) #New
         self.drop      = nn.Dropout(dropout)
-        self.out       = nn.Linear(hidden_size, 1)
+        # self.out       = nn.Linear(hidden_size, 1)
+        self.out   = nn.Linear(hidden_size * 2, 1) # bidirectional doubles the hidden dimension #New
 
         self.with_feature_attn = with_feature_attn
 
@@ -182,6 +191,94 @@ class FocalLoss(nn.BCEWithLogitsLoss):
             return loss.sum()
         else:  # 'none'
             return loss
+        
+
+# ──────────────────────────────────────────────────────────────────────────────
+class SequenceBaggingClassifier(BaseEstimator, ClassifierMixin):
+    """
+    A simple bootstrap-bagging ensemble for sequence data (3D X).
+    
+    Parameters
+    ----------
+    base_estimator : estimator
+        Any object implementing fit(X, y) and predict_proba(X).
+    n_estimators : int
+        Number of bootstrap members.
+    max_samples : float or int, default=1.0
+        If float in (0,1], fraction of samples to draw for each bootstrap.
+        If int, number of samples.
+    n_jobs : int, default=1
+        Parallel jobs for fitting / predicting.
+    random_state : int or None
+        Seed for reproducible bootstraps.
+    """
+    def __init__(
+        self,
+        base_estimator,
+        n_estimators: int = 10,
+        max_samples=1.0,
+        n_jobs: int = 1,
+        random_state=None
+    ):
+        self.base_estimator = base_estimator
+        self.n_estimators   = n_estimators
+        self.max_samples    = max_samples
+        self.n_jobs         = n_jobs
+        self.random_state   = random_state
+
+    def fit(self, X, y):
+        """
+        Fit n_estimators copies of base_estimator on bootstrap samples.
+        
+        X: array-like, shape (n_samples, seq_len, n_features)
+        y: array-like, shape (n_samples,)
+        """
+        X = np.asarray(X)
+        y = np.asarray(y)
+        n_samples = len(X)
+        rng = np.random.RandomState(self.random_state)
+
+        # determine how many per bootstrap
+        if isinstance(self.max_samples, float):
+            m = int(self.max_samples * n_samples)
+        else:
+            m = int(self.max_samples)
+
+        def _fit_one(seed):
+            # each job has its own RNG
+            r = np.random.RandomState(seed)
+            torch.manual_seed(seed)
+            idx = r.randint(0, n_samples, size=m)
+            idx = np.sort(idx)
+            clone_est = clone(self.base_estimator)
+            clone_est.fit(X[idx], y[idx])
+            return clone_est
+
+        seeds = rng.randint(0, 2**16 - 1, size=self.n_estimators)
+        self.estimators_ = [_fit_one(int(s)) for s in seeds]
+        return self
+
+    def predict_proba(self, X):
+        """
+        Average the predicted probabilities from each bootstrap member.
+        """
+        X = np.asarray(X)
+        # collect shape: (n_estimators, n_samples, n_classes)
+        all_probs = [est.predict_proba(X) for est in self.estimators_]
+        # mean over estimators → (n_samples, n_classes)
+        return np.mean(all_probs, axis=0)
+
+    def predict(self, X):
+        """
+        Majority vote on predict_proba (threshold at 0.5).
+        """
+        probs = self.predict_proba(X)
+        return (probs[:, 1] >= 0.5).astype(int)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 
 class LSTMEventTechnicalStrategy(Strategy):
     """
@@ -200,6 +297,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         train_frac = 0.7,
         cv_splits: int = 5,
         n_models: int = 1,
+        bootstrap: float = 0.8,
         random_state: int = 42,
         sequences_length: int = None,
         prob_positive_threshold: float = 0.5,
@@ -211,6 +309,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         self.threshold = np.log(1 + threshold)
         self.cv_splits = cv_splits
         self.n_models = n_models
+        self.bootstrap = bootstrap
         self.random_state = random_state
         self.train_frac = train_frac
         self.sequences_length = sequences_length if sequences_length is not None else horizon
@@ -335,6 +434,12 @@ class LSTMEventTechnicalStrategy(Strategy):
             
                 train_split         = None,   # we’ll handle CV ourselves
                 iterator_train__shuffle = False,
+                # callbacks           = [
+                #     ('lr_scheduler', LRScheduler(
+                #         policy = 'CosineAnnealingLR',
+                #         T_max  = 20
+                #     )),
+                # ],
                 device              = self.device,
             )
 
@@ -346,8 +451,6 @@ class LSTMEventTechnicalStrategy(Strategy):
             # 3) time-series CV
             tscv = TimeSeriesSplit(n_splits=self.cv_splits)
             aucs = []
-            import io
-            from contextlib import redirect_stdout, redirect_stderr
             f = io.StringIO()
             for train_idx, valid_idx in tscv.split(X_train):
                 X_train_CV, y_train_CV = X_train[train_idx], y_train[train_idx]
@@ -467,6 +570,12 @@ class LSTMEventTechnicalStrategy(Strategy):
             
             train_split         = None,       # we’re doing final train on *all* data
             iterator_train__shuffle = False,
+            # callbacks           = [
+            #     ('lr_scheduler', LRScheduler(
+            #         policy = 'CosineAnnealingLR',
+            #         T_max  = 20
+            #     )),
+            # ],
             verbose             = 0,
             device              = self.device
         )
@@ -479,29 +588,19 @@ class LSTMEventTechnicalStrategy(Strategy):
             ('clf', self.net)
         ])
 
-        all_probs = []
-        all_probs_train = []
-        for i in range(self.n_models):
-            # 1) clone a fresh pipeline
-            pipe = clone(self.pipeline)
-            # 2) reseed any RNGs
-            seed = self.random_state + i
-            np.random.seed(seed)
-            torch.manual_seed(seed)
+        self.ensemble = SequenceBaggingClassifier(
+            base_estimator=self.pipeline,
+            n_estimators=self.n_models,
+            max_samples=self.bootstrap,      # each bag sees max_samples% bootstrap
+            random_state=self.random_state
+        )
+        search = self.ensemble
+        search.fit(X_train, y_train)
+        
+        y_pred = search.predict(X_test)
+        y_prob = search.predict_proba(X_test)[:, 1]
+        y_prob_train = search.predict_proba(X_train)[:, 1]
 
-            # 3) fit on the same training data
-            pipe.fit(X_train, y_train)
-
-            # 4) predict proba on X_test and collect P(y=1)
-            y_prob1 = pipe.predict_proba(X_test)[:, 1]
-            y_prob_train1 = pipe.predict_proba(X_train)[:, 1]
-            all_probs.append(y_prob1)
-            all_probs_train.append(y_prob_train1)
-
-        # 5) stack (n_models, n_test) → mean across models → shape (n_test,)
-        y_prob = np.stack(all_probs, axis=0).mean(axis=0)
-        y_prob_train = np.stack(all_probs_train, axis=0).mean(axis=0)
-        y_pred = (y_prob >= 0.5).astype(int)
 
         # 5) Final predictions on test history
         auc_train  = roc_auc_score(y_train, y_prob_train)
