@@ -134,45 +134,37 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    # strat = XGBoostRegressionStrategy(
-    #     horizon = 10,
-    #     train_frac = 0.7,
-    #     cv_splits = 5,
-    #     rfecv_step = 0.1,
-    #     pca_n_components = 25,
-    #     use_pca = False,
-    #     # param_grid = {
-    #     #     'model__n_estimators': [50, 100, 200],
-    #     #     'model__max_depth':    [3, 5, 7],
-    #     #     'model__learning_rate': [0.01, 0.1, 0.2],
-    #     #     'model__subsample':    [0.7, 1.0],
-    #     # },
-    #     signal_thresh = 0.05,
-    #     n_iter_search = 50
-    # )
+    strat = XGBoostRegressionStrategy(
+        horizon = 20,
+        train_frac = 0.7,
+        cv_splits = 5,
+        rfecv_step = 0.1,
+        # pca_n_components = 25,
+        use_pca = False,
+        # param_grid = {
+        #     'model__n_estimators': [50, 100, 200],
+        #     'model__max_depth':    [3, 5, 7],
+        #     'model__learning_rate': [0.01, 0.1, 0.2],
+        #     'model__subsample':    [0.7, 1.0],
+        # },
+        signal_thresh = 0.05,
+        n_iter_search = 50
+    )
 
-    # strat = LSTMEventStrategy(
+    # strat = LSTMEventTechnicalStrategy(
     #     horizon=20,        # predict horizon-day return
     #     threshold=0.05,   # event = next-horizon-day log-return > threshold%
     #     train_frac = 0.7,
-    #     arima_garch_kalman_window = 252,
-    #     random_state=41
+    #     cv_splits = 2,
+    #     n_models = 10,
+    #     bootstrap = 0.8,
+    #     random_state=42,
+    #     # sequences_length = 20,
+    #     prob_positive_threshold = 0.7,
+    #     with_hyperparam_fit = True,
+    #     with_feature_attn = False,
+    #     with_pos_weight = True,
     # )
-
-    strat = LSTMEventTechnicalStrategy(
-        horizon=20,        # predict horizon-day return
-        threshold=0.05,   # event = next-horizon-day log-return > threshold%
-        train_frac = 0.5,
-        cv_splits = 2,
-        n_models = 5,
-        bootstrap = 0.8,
-        random_state=41,
-        # sequences_length = 20,
-        prob_positive_threshold = 0.5,
-        with_hyperparam_fit = False,
-        with_feature_attn = False,
-        with_pos_weight = True,
-    )
 
     start_backtest = time.perf_counter()
 

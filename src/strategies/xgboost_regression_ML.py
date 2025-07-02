@@ -172,7 +172,7 @@ class XGBoostRegressionStrategy(Strategy):
         df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
 
         # Drop NaNs from all rolling
-        return df.dropna()
+        return df
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -183,12 +183,13 @@ class XGBoostRegressionStrategy(Strategy):
         df = data.copy()
 
         # 1) Compute features + target (next-bar return)
+        df['target'] = np.log(df['close'].shift(-self.horizon)/df['close'])
         feat = self._compute_features(df)
-        feat['target'] = np.log(feat['close'].shift(-self.horizon)/feat['close'])
         feat = feat.dropna()
 
         # 3) Split train / test
-        X = feat.drop(columns=['target','close','high','low','open'])            
+        # X = feat.drop(columns=['target','close','high','low','open'])
+        X = feat.drop(columns=['target'])
         y = feat['target']
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, train_size=self.train_frac, shuffle=False
