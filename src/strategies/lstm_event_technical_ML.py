@@ -8,15 +8,16 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin, clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import make_scorer, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import TimeSeriesSplit
+from sklearn.feature_selection import f_classif
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from skorch import NeuralNetClassifier
-from skorch.callbacks import LRScheduler
+from skorch.callbacks import LRScheduler, EarlyStopping
 import optuna
 from torch import tensor
 import io
@@ -274,6 +275,49 @@ class SequenceBaggingClassifier(BaseEstimator, ClassifierMixin):
         """
         probs = self.predict_proba(X)
         return (probs[:, 1] >= 0.5).astype(int)
+    
+# ──────────────────────────────────────────────────────────────────────────────
+
+class SequenceSelectKBest(BaseEstimator, TransformerMixin):
+    """
+    Univariate feature selection for 3D sequence data.
+    
+    During fit:
+      - Collapses X to 2D via last-timestep (or mean over time) 
+      - Runs your score_func (e.g. f_classif) against y
+      - Stores the top-k feature indices.
+    
+    During transform:
+      - Just selects those k feature columns at every time step
+        so your output stays 3D: (n_samples, seq_len, k).
+    """
+    def __init__(self, score_func=f_classif, k=50, use_last_step: bool = True):
+        self.score_func  = score_func
+        self.k           = k
+        self.use_last_step = use_last_step
+
+    def fit(self, X, y):
+        # X: (n_samples, seq_len, n_features)
+        if self.use_last_step:
+            # score on just the final time step
+            X2d = X[:, -1, :]     # shape (n_samples, n_features)
+        else:
+            # or collapse by time-average
+            X2d = X.mean(axis=1)  # shape (n_samples, n_features)
+
+        # run the univariate test
+        scores, _ = self.score_func(X2d, y)
+        # pick top-k
+        self.support_ = np.argsort(scores)[::-1][: self.k]
+        return self
+
+    def transform(self, X):
+        # just index into the feature axis
+        return X[:, :, self.support_]
+
+    def get_support(self):
+        # mimic sklearn API
+        return self.support_
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -408,7 +452,7 @@ class LSTMEventTechnicalStrategy(Strategy):
             # 1) Suggest hyperparameters
             hidden_size = trial.suggest_int("hidden_size", n_feats-n_feats//2, n_feats + n_feats//2, log=False)
             attn_dim    = trial.suggest_int("attn_dim",    n_feats-n_feats//2, n_feats + n_feats//2, log=False)
-            dropout     = trial.suggest_float("dropout",    0.0, 0.3)
+            dropout     = trial.suggest_float("dropout",    0.3, 0.5)
             lr          = trial.suggest_float("lr",         1e-4, 1e-2, log=True)
             batch_size  = trial.suggest_categorical("batch_size", [16, 32, 64])
             max_epochs  = trial.suggest_int("max_epochs",  5, 20)
@@ -427,6 +471,7 @@ class LSTMEventTechnicalStrategy(Strategy):
                 
                 criterion           = FocalLoss(pos_weight = pos_weight, alpha = alpha, gamma=gamma), ##Equivalent to weighted BCE with logits when alpha = 1.0, gamma = 0.0
                 optimizer           = Adam,
+                optimizer__weight_decay=1e-4, #L2 regularization
                 lr                  = lr,
                 
                 batch_size          = batch_size,
@@ -434,12 +479,19 @@ class LSTMEventTechnicalStrategy(Strategy):
             
                 train_split         = None,   # we’ll handle CV ourselves
                 iterator_train__shuffle = False,
-                # callbacks           = [
-                #     ('lr_scheduler', LRScheduler(
-                #         policy = 'CosineAnnealingLR',
-                #         T_max  = 20
-                #     )),
-                # ],
+                callbacks = [
+                        ('early_stop',
+                            EarlyStopping(
+                                    monitor='train_loss', 
+                                    patience=3, 
+                                    threshold=1e-4
+                                    )),
+                        # ('lr_scheduler', 
+                        #     LRScheduler(
+                        #             policy = 'CosineAnnealingLR',
+                        #             T_max  = 20
+                        #         )),
+                    ],
                 device              = self.device,
             )
 
@@ -533,6 +585,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         y_test = y_test.astype(np.float32)
 
         n_feats = X_train.shape[2]
+        # n_feats = 45
 
         if self.with_hyperparam_fit:
             best_params = self.hyperparameter_fit(X_train, y_train)
@@ -540,7 +593,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         else:
             best_params = {"hidden_size":n_feats,
                            "attn_dim":64,
-                           "dropout":0.1,
+                           "dropout":0.3,
                            "lr":1e-3,
                            "batch_size":32,
                            "max_epochs":10,
@@ -563,19 +616,27 @@ class LSTMEventTechnicalStrategy(Strategy):
 
             criterion           = FocalLoss(pos_weight = best_params['pos_weight'], alpha = best_params['alpha'], gamma=best_params['gamma']), ##Equivalent to weighted BCE with logits when alpha = 1.0, gamma = 0.0
             optimizer           = Adam,
+            optimizer__weight_decay=1e-4, #L2 regularization
             lr                  = best_params["lr"],
 
             batch_size          = best_params["batch_size"],
             max_epochs          = best_params["max_epochs"],
             
-            train_split         = None,       # we’re doing final train on *all* data
             iterator_train__shuffle = False,
-            # callbacks           = [
-            #     ('lr_scheduler', LRScheduler(
-            #         policy = 'CosineAnnealingLR',
-            #         T_max  = 20
-            #     )),
-            # ],
+            train_split         = None,       # we’re doing final train on *all* data
+            callbacks = [
+                    ('early_stop',
+                        EarlyStopping(
+                                monitor='train_loss', 
+                                patience=3, 
+                                threshold=1e-4
+                                )),
+                    # ('lr_scheduler', 
+                        # LRScheduler(
+                        #         policy = 'CosineAnnealingLR',
+                        #         T_max  = 20
+                        #     )),
+                ],
             verbose             = 0,
             device              = self.device
         )
@@ -585,6 +646,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         
         self.pipeline = Pipeline([
             ('scale', TimeSeriesScaler(StandardScaler())),
+            # ('select', SequenceSelectKBest(score_func=f_classif, k=n_feats)),
             ('clf', self.net)
         ])
 

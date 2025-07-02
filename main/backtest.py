@@ -164,9 +164,9 @@ if __name__ == "__main__":
         threshold=0.05,   # event = next-horizon-day log-return > threshold%
         train_frac = 0.5,
         cv_splits = 2,
-        n_models = 10,
+        n_models = 5,
         bootstrap = 0.8,
-        random_state=43,
+        random_state=41,
         # sequences_length = 20,
         prob_positive_threshold = 0.5,
         with_hyperparam_fit = False,
