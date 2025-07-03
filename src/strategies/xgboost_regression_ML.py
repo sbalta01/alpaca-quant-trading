@@ -171,7 +171,6 @@ class XGBoostRegressionStrategy(Strategy):
         low52  = df['low'].rolling(52).min()
         df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
 
-        # Drop NaNs from all rolling
         return df
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -244,11 +243,10 @@ class XGBoostRegressionStrategy(Strategy):
         print(f"[{self.name}] R² score. Train: {r2_train:.3f}. Test: {r2_test:.3f}")
         
         # Directional accuracy: how often sign(pred) == sign(true)
-        sign_test = np.sign(y_test)
-        sign_pred = np.sign(y_pred)
-        dir_acc = (sign_test == sign_pred).mean()
+        dir_acc_train = (np.sign(y_train) == np.sign(best.predict(X_train))).mean()
+        dir_acc_test = (np.sign(y_test) == np.sign(y_pred)).mean()
 
-        print(f"[{self.name}] average directional accuracy (Test set): {dir_acc:.3f}")
+        print(f"Average directional accuracy (Train): {dir_acc_train:.3f}, (Test): {dir_acc_test:.3f}")
 
         # 6) Generate stateful signals from continuous preds
         positions = pd.Series(np.nan, index=feat.index)
