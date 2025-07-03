@@ -116,8 +116,8 @@ def run_backtest_strategy(
     num_years = delta.days / 365
 
     # if strategy.name == "XGBoostRegression" or strategy.name == 'LSTMEvent':
-    #     df = attach_factors(df, timeframe=timeframe_yahoo)
-    #     print('Macros fetched')
+    # df = attach_factors(df, timeframe=timeframe_yahoo, with_fundamentals = True)
+
 
     print('Strategy:', strategy.name)
 
