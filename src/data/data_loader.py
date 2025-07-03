@@ -239,7 +239,7 @@ def fetch_macro_series(
 
 
 def attach_factors(
-    price_df: pd.DataFrame, timeframe: str = "1d"
+    price_df: pd.DataFrame, timeframe: str = "1d", with_fundamentals = False
 ) -> pd.DataFrame:
     """
     Given `price_df` with MultiIndex (symbol,timestamp) and price columns,
@@ -254,22 +254,22 @@ def attach_factors(
     funds = fetch_fundamentals(symbols)       # indexed by symbol
     macro = fetch_macro_series(start, end, timeframe=timeframe)    # indexed by date
 
-    # 3) Broadcast fundamentals to each symbol-date
-    #    Create a DataFrame with index=(symbol,timestamp) and the funds columns
+    # 3) Broadcast macro to each (symbol,timestamp)
     idx = price_df.index
-    # funds_panel = pd.DataFrame(index=idx)
-    # for col in funds.columns:
-    #     # map each symbol to its fundamental
-    #     funds_panel[col] = idx.get_level_values('symbol').map(funds[col])
-
-    # 4) Broadcast macro to each (symbol,timestamp)
     macro_panel = pd.DataFrame(index=idx)
-    # normalize timestamps to date
     ts_dates = pd.to_datetime(idx.get_level_values('timestamp').normalize())
     for col in macro.columns:
         macro_panel[col] = macro[col].reindex(ts_dates).values
 
-    # 5) Concatenate to original
-    # augmented = pd.concat([price_df, funds_panel, macro_panel], axis=1).ffill() #Fill last row with previous value
-    augmented = pd.concat([price_df, macro_panel], axis=1).ffill() #Fill last row with previous value
+    # Optional) Broadcast fundamentals to each symbol-date
+    if with_fundamentals:
+        funds_panel = pd.DataFrame(index=idx)
+        for col in funds.columns:
+            funds_panel[col] = idx.get_level_values('symbol').map(funds[col])
+        augmented = pd.concat([price_df, funds_panel, macro_panel], axis=1).ffill()
+        print('Macros and fundamentals fetched')
+    else:
+        augmented = pd.concat([price_df, macro_panel], axis=1).ffill()
+        print('Macros fetched')
+
     return augmented
