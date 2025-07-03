@@ -9,6 +9,7 @@ from src.strategies.adaboost_ML import AdaBoostStrategy
 from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
 from src.strategies.lstm_event_arima_garch_ML import LSTMEventStrategy
 from src.strategies.lstm_event_technical_ML import LSTMEventTechnicalStrategy
+from src.strategies.lstm_regression_ML import LSTMRegressionStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.execution.backtest_executor import run_backtest_strategy
 from src.backtesting.visualizer import plot_returns, plot_signals
@@ -134,22 +135,22 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    strat = XGBoostRegressionStrategy(
-        horizon = 20,
-        train_frac = 0.7,
-        cv_splits = 5,
-        rfecv_step = 0.1,
-        # pca_n_components = 25,
-        use_pca = False,
-        # param_grid = {
-        #     'model__n_estimators': [50, 100, 200],
-        #     'model__max_depth':    [3, 5, 7],
-        #     'model__learning_rate': [0.01, 0.1, 0.2],
-        #     'model__subsample':    [0.7, 1.0],
-        # },
-        signal_thresh = 0.05,
-        n_iter_search = 50
-    )
+    # strat = XGBoostRegressionStrategy(
+    #     horizon = 20,
+    #     train_frac = 0.7,
+    #     cv_splits = 5,
+    #     rfecv_step = 0.1,
+    #     # pca_n_components = 25,
+    #     use_pca = False,
+    #     # param_grid = {
+    #     #     'model__n_estimators': [50, 100, 200],
+    #     #     'model__max_depth':    [3, 5, 7],
+    #     #     'model__learning_rate': [0.01, 0.1, 0.2],
+    #     #     'model__subsample':    [0.7, 1.0],
+    #     # },
+    #     signal_thresh = 0.05,
+    #     n_iter_search = 50
+    # )
 
     # strat = LSTMEventTechnicalStrategy(
     #     horizon=20,        # predict horizon-day return
@@ -165,6 +166,19 @@ if __name__ == "__main__":
     #     with_feature_attn = False,
     #     with_pos_weight = True,
     # )
+
+    strat = LSTMRegressionStrategy(
+        horizon=20,        # predict next horizon-day return
+        threshold=0.05,   # event = next-horizon-day log-return
+        train_frac = 0.7,
+        cv_splits = 5,
+        n_models = 5,
+        bootstrap = 0.7,
+        random_state=42,
+        # sequences_length = 20,
+        with_hyperparam_fit = True,
+        with_feature_attn = False,
+    )
 
     start_backtest = time.perf_counter()
 
