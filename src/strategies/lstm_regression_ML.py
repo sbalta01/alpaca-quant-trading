@@ -5,10 +5,10 @@ import math
 import numpy as np
 import pandas as pd
 
-from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin, clone
+from sklearn.base import BaseEstimator, RegressorMixin, clone
+from sklearn.metrics import r2_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.feature_selection import f_classif
 
@@ -16,12 +16,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
-from skorch import NeuralNetClassifier
+from skorch import NeuralNetRegressor
 from skorch.callbacks import LRScheduler, EarlyStopping
 import optuna
-from torch import tensor
 import io
 from contextlib import redirect_stdout, redirect_stderr
+
+from src.strategies.lstm_event_technical_ML import DynamicFeatureAttention, TemporalAttention, TimeSeriesScaler
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 logging.getLogger("optuna").setLevel(logging.WARNING)
@@ -30,68 +31,7 @@ logging.getLogger("optuna").setLevel(logging.WARNING)
 from src.strategies.base_strategy import Strategy
 from src.utils.tools import adx, compute_turbulence_single_symbol, sma, ema, rsi
 
-
-
-class DynamicFeatureAttention(nn.Module):
-    """
-    For each time-step t, computes an attention weight over features:
-      alpha_t = softmax( W2 · tanh(W1 x_t + b1) + b2 )
-    where x_t ∈ R^F is the feature-vector at time t.
-    """
-    def __init__(self, n_features, attn_dim=64):
-        super().__init__()
-        self.W1 = nn.Linear(n_features, attn_dim, bias=True)
-        self.W2 = nn.Linear(attn_dim, n_features, bias=True)
-        self.ln = nn.LayerNorm(n_features)
-
-    def forward(self, X):
-        # X: [batch, seq_len, features]
-        B, T, F_ = X.shape
-        # flatten to [B*T, F]
-        x_flat = X.view(B * T, F_)
-        h       = torch.tanh(self.W1(x_flat))        # [B*T, attn_dim]
-        scores  = self.W2(h)                         # [B*T, F]
-        scores = scores / math.sqrt(F_)
-        alpha       = F.softmax(scores, dim=-1)          # attention per feature
-        # re-shape alpha → [B, T, F]
-        alpha = alpha.view(B, T, F_)
-        # weighted input
-        # return X * alpha
-        X_att = X * alpha.view(B, T, F_)
-        # add residual + norm
-        return self.ln(X + X_att)
-
-
-class TemporalAttention(nn.Module):
-    """
-    Given LSTM outputs H ∈ R^{B*T*H}, computes an attention
-    over the time dimension and returns a single context vector:
-      β = softmax( v^T tanh(W H + b) )
-      context = Σ_t β_t H_t
-    """
-    def __init__(self, hidden_size, attn_dim=64):
-        super().__init__()
-        self.W = nn.Linear(hidden_size, attn_dim, bias=True)
-        self.v = nn.Linear(attn_dim, 1, bias=False)
-        self.ln = nn.LayerNorm(hidden_size)
-
-    def forward(self, H):
-        # H: [B, T, H]
-        B, T, Hdim = H.shape
-        # flatten to [B*T, H]
-        h_flat = H.contiguous().view(B * T, Hdim)
-        u      = torch.tanh(self.W(h_flat))             # [B*T, attn_dim]
-        e      = self.v(u).view(B, T)                   # [B, T]
-        β      = F.softmax(e, dim=1).unsqueeze(-1)       # [B, T, 1]
-        # context: weighted sum over time
-        context = (H * β).sum(dim=1)                     # [B, H]
-        # return context
-        # residual from last LSTM hidden
-        res = H[:, -1, :]
-        return self.ln(context + res)
-
-
-class AttentionLSTMClassifier(nn.Module):
+class AttentionLSTMRegressor(nn.Module):
     """
     1) Dynamic feature-level attention per time step
     2) LSTM over the attended inputs
@@ -132,77 +72,16 @@ class AttentionLSTMClassifier(nn.Module):
             h = H[:, -1, :]                  # [B, hidden]
             h = self.drop(h)
             return self.out(h).squeeze(-1)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TimeSeriesScaler(TransformerMixin, BaseEstimator):
-    """
-    Wraps any 2D scaler (e.g. StandardScaler) so it will
-    scale each feature across both the sample and time axes.
-    Expects X of shape (n_samples, seq_len, n_features).
-    """
-    def __init__(self, scaler=None):
-        # allow passing in a custom scaler like MinMaxScaler if you want
-        self.scaler = scaler or StandardScaler()
-
-    def fit(self, X, y=None):
-        # X: (n_samples, seq_len, n_features)
-        n_s, t, n_f = X.shape
-        # flatten time into samples
-        flat = X.reshape(-1, n_f)  # shape (n_s * t, n_f)
-        self.scaler.fit(flat)
-        return self
-
-    def transform(self, X):
-        n_s, t, n_f = X.shape
-        flat = X.reshape(-1, n_f)
-        flat_scaled = self.scaler.transform(flat)
-        return flat_scaled.reshape(n_s, t, n_f)
-
-# ──────────────────────────────────────────────────────────────────────────────
-
-class FocalLoss(nn.BCEWithLogitsLoss):
-    """
-    Focal Loss for binary classification.
-    """
-    def __init__(self, pos_weight: float= 1.0, alpha: float = 1.0, gamma: float = 2.0,
-                 reduction: str = 'mean'):
-        super().__init__(reduction=reduction)
-        self.pos_weight = tensor([pos_weight])
-        self.alpha = alpha
-        self.gamma = gamma
-
-    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        # BCE part (still uses the internal weight/bias machinery of BCEWithLogitsLoss)
-        bce = super().forward(logits, targets)
-
-        # p_t = {p if y=1; 1-p if y=0}
-        prob = torch.sigmoid(logits)
-        p_t = targets * prob + (1 - targets) * (1 - prob)
-
-        # focal weighting factor
-        focal_factor = self.alpha * (1 - p_t) ** self.gamma
-
-        loss = focal_factor * bce
-
-        if self.reduction == 'mean':
-            return loss.mean()
-        elif self.reduction == 'sum':
-            return loss.sum()
-        else:  # 'none'
-            return loss
         
 
-# ──────────────────────────────────────────────────────────────────────────────
-class SequenceBaggingClassifier(BaseEstimator, ClassifierMixin):
+class SequenceBaggingRegressor(BaseEstimator, RegressorMixin):
     """
     A simple bootstrap-bagging ensemble for sequence data (3D X).
     
     Parameters
     ----------
     base_estimator : estimator
-        Any object implementing fit(X, y) and predict_proba(X).
+        Any object implementing fit(X, y) and predict(X).
     n_estimators : int
         Number of bootstrap members.
     max_samples : float or int, default=1.0
@@ -259,79 +138,28 @@ class SequenceBaggingClassifier(BaseEstimator, ClassifierMixin):
         self.estimators_ = [_fit_one(int(s)) for s in seeds]
         return self
 
-    def predict_proba(self, X):
+    def predict(self, X):
         """
-        Average the predicted probabilities from each bootstrap member.
+        Average the predictions from each bootstrap member.
         """
         X = np.asarray(X)
         # collect shape: (n_estimators, n_samples, n_classes)
-        all_probs = [est.predict_proba(X) for est in self.estimators_]
+        all_preds = [est.predict(X) for est in self.estimators_]
         # mean over estimators → (n_samples, n_classes)
-        return np.mean(all_probs, axis=0)
+        return np.mean(all_preds, axis=0)
 
-    def predict(self, X):
-        """
-        Majority vote on predict_proba (threshold at 0.5).
-        """
-        probs = self.predict_proba(X)
-        return (probs[:, 1] >= 0.5).astype(int)
-    
+# ──────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 # ──────────────────────────────────────────────────────────────────────────────
 
-class SequenceSelectKBest(BaseEstimator, TransformerMixin):
+class LSTMRegressionStrategy(Strategy):
     """
-    Univariate feature selection for 3D sequence data.
-    
-    During fit:
-      - Collapses X to 2D via last-timestep (or mean over time) 
-      - Runs your score_func (e.g. f_classif) against y
-      - Stores the top-k feature indices.
-    
-    During transform:
-      - Just selects those k feature columns at every time step
-        so your output stays 3D: (n_samples, seq_len, k).
-    """
-    def __init__(self, score_func=f_classif, k=50, use_last_step: bool = True):
-        self.score_func  = score_func
-        self.k           = k
-        self.use_last_step = use_last_step
-
-    def fit(self, X, y):
-        # X: (n_samples, seq_len, n_features)
-        if self.use_last_step:
-            # score on just the final time step
-            X2d = X[:, -1, :]     # shape (n_samples, n_features)
-        else:
-            # or collapse by time-average
-            X2d = X.mean(axis=1)  # shape (n_samples, n_features)
-
-        # run the univariate test
-        scores, _ = self.score_func(X2d, y)
-        # pick top-k
-        self.support_ = np.argsort(scores)[::-1][: self.k]
-        return self
-
-    def transform(self, X):
-        # just index into the feature axis
-        return X[:, :, self.support_]
-
-    def get_support(self):
-        # mimic sklearn API
-        return self.support_
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
-
-class LSTMEventTechnicalStrategy(Strategy):
-    """
-    Predict and signal “big-move” days: next-N-day log-return > threshold.
-    Uses ARIMA/GARCH/Kalman + technicals + (optional) macro columns,
-    a PyTorch LSTM classifier via skorch, RFECV feature-selection,
+    Predict and signal next-N-day log-return.
+    Uses technicals + (optional) macro columns,
+    a PyTorch LSTM regressor via skorch, RFECV feature-selection,
     and forward-rolling CV for hyperparameter search.
     """
-    name = "LSTMEventTechnical"
+    name = "LSTMRegression"
     multi_symbol = False
 
     def __init__(
@@ -344,10 +172,8 @@ class LSTMEventTechnicalStrategy(Strategy):
         bootstrap: float = 0.8,
         random_state: int = 42,
         sequences_length: int = None,
-        prob_positive_threshold: float = 0.5,
         with_hyperparam_fit: bool = True,
         with_feature_attn: bool = True,
-        with_pos_weight: bool = True,
     ):
         self.horizon   = horizon
         self.threshold = np.log(1 + threshold)
@@ -357,10 +183,8 @@ class LSTMEventTechnicalStrategy(Strategy):
         self.random_state = random_state
         self.train_frac = train_frac
         self.sequences_length = sequences_length if sequences_length is not None else horizon
-        self.prob_positive_threshold = prob_positive_threshold
         self.with_hyperparam_fit = with_hyperparam_fit
         self.with_feature_attn = with_feature_attn
-        self.with_pos_weight = with_pos_weight
 
         if torch.cuda.is_available(): #Disabled
                 self.device = 'cuda'
@@ -373,11 +197,11 @@ class LSTMEventTechnicalStrategy(Strategy):
         df = df.copy()
         idx = df.index
 
-        # # --- Calendar data with cyclical embedding
-        # df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
-        # df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
-        # df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
-        # df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
+        # --- Calendar data with cyclical embedding
+        df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
+        df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
+        df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
+        df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
 
         # --- Price & lag features ---
         df['logret'] = np.log(df['close'] / df['close'].shift(1))
@@ -447,7 +271,6 @@ class LSTMEventTechnicalStrategy(Strategy):
 
     def hyperparameter_fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame):
         n_feats = X_train.shape[2]
-        naive_pos_weight = (len(y_train) - y_train.sum()) / y_train.sum() #0's/1's
         def objective(trial):
             # 1) Suggest hyperparameters
             hidden_size = trial.suggest_int("hidden_size", n_feats-n_feats//2, n_feats + n_feats//2, log=False)
@@ -456,20 +279,17 @@ class LSTMEventTechnicalStrategy(Strategy):
             lr          = trial.suggest_float("lr",         1e-4, 1e-2, log=True)
             batch_size  = trial.suggest_categorical("batch_size", [16, 32, 64])
             max_epochs  = trial.suggest_int("max_epochs",  5, 20)
-            pos_weight  = trial.suggest_float("pos_weight",  min(1,naive_pos_weight-naive_pos_weight//2), naive_pos_weight+naive_pos_weight//2)
-            alpha       = trial.suggest_float("alpha",  0.1, 2)
-            gamma       = trial.suggest_float("gamma",  0.25, 2)
             
-            # 2) Build a fresh skorch net with your LSTM Classifier
-            net = NeuralNetClassifier(
-                module              = AttentionLSTMClassifier,
+            # 2) Build a fresh skorch net with your LSTM Regressor
+            net = NeuralNetRegressor(
+                module              = AttentionLSTMRegressor,
                 module__n_features  = n_feats,               # your feature‐count
                 module__hidden_size = hidden_size,
                 module__attn_dim    = attn_dim,
                 module__dropout     = dropout,
                 module__with_feature_attn = self.with_feature_attn,
                 
-                criterion           = FocalLoss(pos_weight = pos_weight, alpha = alpha, gamma=gamma), ##Equivalent to weighted BCE with logits when alpha = 1.0, gamma = 0.0
+                criterion           = nn.MSELoss,
                 optimizer           = Adam,
                 optimizer__weight_decay=1e-4, #L2 regularization
                 lr                  = lr,
@@ -507,25 +327,13 @@ class LSTMEventTechnicalStrategy(Strategy):
             for train_idx, valid_idx in tscv.split(X_train):
                 X_train_CV, y_train_CV = X_train[train_idx], y_train[train_idx]
                 X_val_CV, y_val_CV     = X_train[valid_idx], y_train[valid_idx]
-
-                # If either split has only one class, skip this trial
-                if len(np.unique(y_train_CV)) < 2 or len(np.unique(y_val_CV)) < 2:
-                    print("Either train or test has only one class, skip this trial")
-                    raise optuna.TrialPruned()
         
                 with redirect_stdout(f), redirect_stderr(f):
                     pipe.fit(X_train_CV, y_train_CV)
                 
                 y_pred_CV = pipe.predict(X_val_CV)
-                y_prob_CV = pipe.predict_proba(X_val_CV)[:,1]
 
-                if len(np.unique(y_pred_CV)) < 2:
-                    print("Only one class has been predicted, skip this trial")
-                    raise optuna.TrialPruned()
-                
-                # aucs.append(roc_auc_score(y_val_CV, y_prob_CV))
-                aucs.append(precision_score(y_val_CV, y_pred_CV))
-                # aucs.append(recall_score(y_val_CV, y_pred_CV))
+                aucs.append(r2_score(y_val_CV, y_pred_CV))
                 
                 # allow Optuna to prune bad trials early
                 trial.report(np.mean(aucs), len(aucs))
@@ -547,15 +355,14 @@ class LSTMEventTechnicalStrategy(Strategy):
         df = data.copy()       
 
         # 1) Compute features + target (next-bar return)
-        target = np.log(df['close'].shift(-self.horizon) / df['close'])
-        df['event'] = (target > self.threshold).astype(int) #This will not affect the calculation of any feature, thus no leakage
+        df['target'] = np.log(df['close'].shift(-self.horizon)/df['close'])
         feat = self._compute_features(df)
         feat = feat.dropna()  #This order (1st event, then features, then dropping na) prevents any misalignment
 
         # 3) Split train / test
-        X = feat.drop(columns=['event']) #Remove data leakage
-        # X = feat.drop(columns=['event','open','high','low','close','volume'])
-        y = feat['event']
+        X = feat.drop(columns=['target']) #Remove data leakage
+        # X = feat.drop(columns=['target','open','high','low','close','volume'])
+        y = feat['target']
 
         split_index = int(len(feat) * self.train_frac)
         X_train_full = X.iloc[:split_index]
@@ -597,24 +404,18 @@ class LSTMEventTechnicalStrategy(Strategy):
                            "lr":1e-3,
                            "batch_size":32,
                            "max_epochs":10,
-                           "alpha":0.25,
-                           "gamma":1,
                            }
             print("No hyperparameter fitting")
-            if self.with_pos_weight:
-                best_params['pos_weight'] = (len(y_train) - y_train.sum()) / y_train.sum() #0's/1's
-            else:
-                best_params['pos_weight'] = 1.0
         
-        self.net = NeuralNetClassifier(
-            module              = AttentionLSTMClassifier,
+        self.net = NeuralNetRegressor(
+            module              = AttentionLSTMRegressor,
             module__n_features  = n_feats,
             module__hidden_size = best_params["hidden_size"],
             module__attn_dim    = best_params["attn_dim"],
             module__dropout     = best_params["dropout"],
             module__with_feature_attn = self.with_feature_attn,
 
-            criterion           = FocalLoss(pos_weight = best_params['pos_weight'], alpha = best_params['alpha'], gamma=best_params['gamma']), ##Equivalent to weighted BCE with logits when alpha = 1.0, gamma = 0.0
+            criterion           = nn.MSELoss,
             optimizer           = Adam,
             optimizer__weight_decay=1e-4, #L2 regularization
             lr                  = best_params["lr"],
@@ -641,33 +442,34 @@ class LSTMEventTechnicalStrategy(Strategy):
             device              = self.device
         )
 
-        if len(np.unique(y_train)) < 2 or len(np.unique(y_test)) < 2:
-                    raise Exception("One class is not represented")
-        
         self.pipeline = Pipeline([
             ('scale', TimeSeriesScaler(StandardScaler())),
             # ('select', SequenceSelectKBest(score_func=f_classif, k=n_feats)),
             ('clf', self.net)
         ])
 
-        self.ensemble = SequenceBaggingClassifier(
+        self.ensemble = SequenceBaggingRegressor(
             base_estimator=self.pipeline,
             n_estimators=self.n_models,
             max_samples=self.bootstrap,      # each bag sees max_samples% bootstrap
             random_state=self.random_state
         )
         search = self.ensemble
+
         search.fit(X_train, y_train)
         
         y_pred = search.predict(X_test)
-        y_prob = search.predict_proba(X_test)[:, 1]
-        y_prob_train = search.predict_proba(X_train)[:, 1]
-
 
         # 5) Final predictions on test history
-        auc_train  = roc_auc_score(y_train, y_prob_train)
-        auc_test  = roc_auc_score(y_test, y_prob)
-        print(f"ROC AUC (Train): {auc_train:.3f}, ROC AUC (Test): {auc_test:.3f}")
+        r2_train = r2_score(y_train, search.predict(X_train))
+        r2_test  = r2_score(y_test,  y_pred)
+        print(f"R² (Train): {r2_train:.3f}, R² (Test): {r2_test:.3f}")        
+        
+        # Directional accuracy: how often sign(pred) == sign(true)
+        dir_acc_train = (np.sign(y_train) == np.sign(search.predict(X_train))).mean()
+        dir_acc_test = (np.sign(y_test) == np.sign(y_pred)).mean()
+
+        print(f"Average directional accuracy (Train): {dir_acc_train:.3f}, (Test): {dir_acc_test:.3f}")
 
         # 6) Build a signal series
         positions = pd.Series(np.nan, index=df.index)
@@ -677,16 +479,16 @@ class LSTMEventTechnicalStrategy(Strategy):
         test_mask = pd.Series(0.0, index=df.index)
         position = 0
         days_left = 0
-        for t, pred, prob, test in zip(times_test, y_pred, y_prob, y_test):
+        for t, pred, test in zip(times_test, y_pred, y_test):
             if days_left > 0:
                 days_left -= 1
-                if prob >= self.prob_positive_threshold:
+                if pred  >= self.threshold:
                     days_left += 1
             else:
-                if position == 0 and prob >= self.prob_positive_threshold:
+                if position == 0 and pred  >= self.threshold:
                     position = 1
                     days_left = self.horizon - 1
-                elif position == 1 and prob < self.prob_positive_threshold:
+                elif position == 1 and pred  < self.threshold:
                     position = 0 #exit to flat
             positions.at[t] = position
             y_pred_series.at[t] = pred
