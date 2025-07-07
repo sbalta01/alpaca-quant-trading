@@ -17,7 +17,7 @@ from xgboost import XGBRegressor
 from src.utils.metrics import sharpe_scorer
 
 from src.strategies.base_strategy import Strategy
-from src.utils.tools import adx, ema, rsi, sma
+from src.utils.tools import adx, ema, rsi, sma, threshold_adjust
 
 class XGBoostRegressionStrategy(Strategy):
     """
@@ -37,11 +37,13 @@ class XGBoostRegressionStrategy(Strategy):
         cv_splits: int = 5,
         rfecv_step: float = 0.1,
         pca_n_components: float = 0.95,
-        use_pca: bool = True,
         param_grid: Dict[str, Any] = None,
         signal_thresh: float = 0.0, #Minimum daily return to trade
         random_state: int = 42,
-        n_iter_search: int = 50
+        n_iter_search: int = 50,
+        with_pca: bool = True,
+        with_feature_selection: bool = True,
+        adjust_threshold: bool = True,
     ):
         self.horizon = horizon
         # train/test split fraction
@@ -51,10 +53,12 @@ class XGBoostRegressionStrategy(Strategy):
         # RFECV step size
         self.rfecv_step = rfecv_step
         self.random_state = random_state
-        self.use_pca         = use_pca
         self.pca_n_components= pca_n_components
         self.n_iter_search = n_iter_search
         self.signal_thresh = np.log(signal_thresh + 1) #Consistent with log-target
+        self.with_pca = with_pca
+        self.with_feature_selection = with_feature_selection
+        self.adjust_threshold = adjust_threshold
 
         # default hyperparameter grid for XGB
         self.param_grid = param_grid or {
@@ -72,24 +76,30 @@ class XGBoostRegressionStrategy(Strategy):
         steps = []
         steps.append(('scaler', StandardScaler()))
 
-        if self.use_pca:
+        if self.with_pca:
             # If pca_n_components < 1.0, sklearn treats as fraction of variance
             steps.append(('pca', PCA(n_components=self.pca_n_components, random_state=self.random_state)))
+            print("PCA enabled")
 
-        inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
         base = XGBRegressor(
             objective='reg:squarederror',
             random_state=self.random_state,
             verbosity=0
         )
 
-        steps.append(('rfecv', RFECV(
-            estimator=base,
-            step=self.rfecv_step,
-            cv=inner_cv,
-            scoring='r2',
-            n_jobs=-1
-        )))
+        if self.with_feature_selection:
+            inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
+            steps.append(('rfecv', RFECV(
+                estimator=base,
+                step=self.rfecv_step,
+                min_features_to_select=10,
+                cv=inner_cv,
+                scoring='r2',
+                n_jobs=-1
+            )))
+            print("Feature selection enabled")
+        else:
+            print("No feature selection")
 
         steps.append(('model', base))
         self.pipeline = Pipeline(steps)
@@ -102,11 +112,6 @@ class XGBoostRegressionStrategy(Strategy):
         df = df.copy()
 
         # --- Price & lag features ---
-        df['open'] = df['open']
-        df['high'] = df['high']
-        df['low']  = df['low']
-        df['close'] = df['close']
-
         df['logret'] = np.log(df['close'] / df['close'].shift(1))
         df[f'vol{self.horizon}'] = df['logret'].rolling(self.horizon).std()
         df[f'logret{self.horizon}'] = np.log(df['close'] / df['close'].shift(self.horizon))
@@ -170,7 +175,6 @@ class XGBoostRegressionStrategy(Strategy):
         high52 = df['high'].rolling(52).max()
         low52  = df['low'].rolling(52).min()
         df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
-
         return df
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -207,7 +211,8 @@ class XGBoostRegressionStrategy(Strategy):
                 # scoring='r2',
                 scoring=sharpe_scorer,
                 random_state=self.random_state,
-                n_jobs=-1
+                n_jobs=-1,
+                verbose=0,
             )
             print('Random Search CV')
         else:
@@ -217,7 +222,8 @@ class XGBoostRegressionStrategy(Strategy):
             cv=outer_cv,
             # scoring='r2',
             scoring=sharpe_scorer,
-            n_jobs=-1
+            n_jobs=-1,
+            verbose=0,
             )
             print('Grid Search CV')
 
@@ -233,7 +239,7 @@ class XGBoostRegressionStrategy(Strategy):
             for feature_name, rank in zip(feature_names, ranking):
                 print(f"{feature_name:15s} → rank {rank}")
         except:
-            print('No RFECV')
+            print('')
 
         # 5) Evaluate R²
         y_pred = pd.Series(best.predict(X_test), index=X_test.index)
@@ -257,11 +263,15 @@ class XGBoostRegressionStrategy(Strategy):
         idxs = list(X_test.index)
         position = 0
         days_left = 0
+        adjusted_signal_thresh = threshold_adjust(feat['logret'], horizon = self.horizon, base_threshold = self.signal_thresh, max_shift=0.4*self.signal_thresh) if self.adjust_threshold else pd.Series(self.signal_thresh, index = idxs)
+        y_pred = pd.Series(y_pred).rolling(3).mean() #Smooth the probabilities to avoid single-day flops
         for t, pred, test in zip(idxs, y_pred, y_test):
             if days_left > 0:
                 days_left -= 1
+                if pred >= adjusted_signal_thresh.at[t]:
+                    days_left += 1
             else:
-                if position == 0 and pred > self.signal_thresh:
+                if position == 0 and pred > adjusted_signal_thresh.at[t]:
                     position = 1
                     days_left = self.horizon - 1
                 elif position == 1 and pred <= 0.0:
@@ -278,7 +288,7 @@ class XGBoostRegressionStrategy(Strategy):
             y_pred_series.at[t] = pred
             y_test_series.at[t] = test
             test_mask.at[t] = 1.0
-        print('Max prediction', y_pred_series.max())
+        print('Max prediction', y_pred_series.max(),y_pred_series.idxmax())
         # 7) Merge signals into df
         out = df.copy()
         out["position"] = positions
