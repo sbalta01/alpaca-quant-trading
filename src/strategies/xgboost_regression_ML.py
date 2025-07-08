@@ -340,10 +340,10 @@ class XGBoostRegressionStrategy(Strategy):
             y_pred_series.at[t] = pred
             y_test_series.at[t] = test
             test_mask.at[t] = 1.0
-        print('Max prediction', y_pred_series.max(),y_pred_series.idxmax())
-        print('Max label', y_test.max(),y_test.idxmax())
-        print('Min prediction', y_pred.min(),y_pred.idxmin())
-        print('Min label', y_test.min(),y_test.idxmin())
+        # print('Max prediction', y_pred_series.max(),y_pred_series.idxmax())
+        # print('Max label', y_test.max(),y_test.idxmax())
+        # print('Min prediction', y_pred.min(),y_pred.idxmin())
+        # print('Min label', y_test.min(),y_test.idxmin())
         # 7) Merge signals into df
         out = df.copy()
         out["position"] = positions
