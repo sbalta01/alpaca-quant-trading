@@ -28,7 +28,7 @@ logging.getLogger("optuna").setLevel(logging.WARNING)
 
 
 from src.strategies.base_strategy import Strategy
-from src.utils.tools import adx, compute_turbulence_single_symbol, sma, ema, rsi
+from src.utils.tools import adx, compute_turbulence_single_symbol, sma, ema, rsi, threshold_adjust
 
 
 
@@ -348,6 +348,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         with_hyperparam_fit: bool = True,
         with_feature_attn: bool = True,
         with_pos_weight: bool = True,
+        adjust_threshold: bool = False,
     ):
         self.horizon   = horizon
         self.threshold = np.log(1 + threshold)
@@ -361,6 +362,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         self.with_hyperparam_fit = with_hyperparam_fit
         self.with_feature_attn = with_feature_attn
         self.with_pos_weight = with_pos_weight
+        self.adjust_threshold = adjust_threshold
 
         if torch.cuda.is_available(): #Disabled
                 self.device = 'cuda'
@@ -370,14 +372,18 @@ class LSTMEventTechnicalStrategy(Strategy):
                 print("Current device name: ", self.device)
         
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Compute technical & Ichimoku features from price DataFrame.
+        Expects df has columns: ['open','high','low','close','volume'].
+        """
         df = df.copy()
         idx = df.index
 
-        # # --- Calendar data with cyclical embedding
-        # df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
-        # df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
-        # df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
-        # df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
+        # --- Calendar data with cyclical embedding
+        df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
+        df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
+        df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
+        df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
 
         # --- Price & lag features ---
         df['logret'] = np.log(df['close'] / df['close'].shift(1))
@@ -386,17 +392,19 @@ class LSTMEventTechnicalStrategy(Strategy):
 
 
         # --- Volume features ---
-        df['volume_1'] = df['volume'].shift(1)
-        df['volume_inc'] = df['volume'] - df['volume_1']
+        df['volume'] = df['volume']
+        # df['volume_1'] = df['volume'].shift(1)
+        df['volume_inc'] = df['volume'] - df['volume'].shift(1)
 
         # --- Moving Averages & their diffs ---
-        for w in (5,10,20,50):
+        # for w in (5,10,20,50):
+        for w in [self.horizon]:
             df[f'sma{w}']    = sma(df['close'], w)
-            df[f'sma{w}_1'] = df[f'sma{w}'].shift(1)
-            df[f'sma{w}_inc'] = df[f'sma{w}'] - df[f'sma{w}_1']
+            # df[f'sma{w}_1'] = df[f'sma{w}'].shift(1)
+            df[f'sma{w}_inc'] = df[f'sma{w}'] - df[f'sma{w}'].shift(1)
             df[f'ema{w}']    = ema(df['close'], w)
-            df[f'ema{w}_1'] = df[f'ema{w}'].shift(1)
-            df[f'ema{w}_inc'] = df[f'ema{w}'] - df[f'ema{w}_1']
+            # df[f'ema{w}_1'] = df[f'ema{w}'].shift(1)
+            df[f'ema{w}_inc'] = df[f'ema{w}'] - df[f'ema{w}'].shift(1)
 
         # --- RSI(14) ---
         df['RSI14'] = rsi(df['close'], 14)
@@ -405,15 +413,16 @@ class LSTMEventTechnicalStrategy(Strategy):
         df['OBV'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
 
         # --- ROC ---
-        for w in (5,10,20):
+        # for w in (5,10,20):
+        for w in [self.horizon]:
             df[f'ROC{w}'] = df['close'].pct_change(w)
 
         # --- MACD + Signal(9) + hist ---
-        df['ema12'] = ema(df['close'], 12)
-        df['ema26'] = ema(df['close'], 26)
-        df['macd']  = df['ema12'] - df['ema26']
-        df['macd_sig']  = ema(df['macd'], 9)
-        df['macd_hist'] = df['macd'] - df['macd_sig']
+        # df['ema12'] = ema(df['close'], 12)
+        # df['ema26'] = ema(df['close'], 26)
+        df['macd']  = ema(df['close'], 12) - ema(df['close'], 26)
+        # df['macd_sig']  = ema(df['macd'], 9)
+        df['macd_hist'] = df['macd'] - ema(df['macd'], 9)
 
         # --- Stochastic %K(3), %D(3) ---
         low3  = df['low'].rolling(3).min()
@@ -438,11 +447,14 @@ class LSTMEventTechnicalStrategy(Strategy):
         high26 = df['high'].rolling(26).max()
         low26  = df['low'].rolling(26).min()
         df['ichimoku_base'] = (high26 + low26) / 2
-        df['ichimoku_span_a'] = ((df['ichimoku_conv'] + df['ichimoku_base'])/2).shift(26)
-        high52 = df['high'].rolling(52).max()
-        low52  = df['low'].rolling(52).min()
-        df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
-        # df['turbulence'] = compute_turbulence_single_symbol(df, window=252)
+        # df['ichimoku_span_a'] = ((df['ichimoku_conv'] + df['ichimoku_base'])/2).shift(26)
+        # high52 = df['high'].rolling(52).max()
+        # low52  = df['low'].rolling(52).min()
+        # df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
+
+        # Higher moments of log‑returns
+        df['skew5']    = df['logret'].rolling(self.horizon).skew()
+        df['kurt5']    = df['logret'].rolling(self.horizon).kurt()
         return df
 
     def hyperparameter_fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame):
@@ -677,16 +689,23 @@ class LSTMEventTechnicalStrategy(Strategy):
         test_mask = pd.Series(0.0, index=df.index)
         position = 0
         days_left = 0
-        for t, pred, prob, test in zip(times_test, y_pred, y_prob, y_test):
+        
+        adjusted_prob_threshold = threshold_adjust(feat['logret'], horizon = self.horizon, base_threshold = 0.5, max_shift=0.2) if self.adjust_threshold else pd.Series(self.prob_positive_threshold, index = times_test)
+        
+        y_prob = pd.Series(y_prob).rolling(self.horizon).mean() #Smooth the probabilities to avoid single-day flops
+        for t, prob, test in zip(times_test, y_prob, y_test):
+            pred = 0
             if days_left > 0:
                 days_left -= 1
-                if prob >= self.prob_positive_threshold:
+                if prob >= adjusted_prob_threshold.at[t]:
                     days_left += 1
+                    pred = 1
             else:
-                if position == 0 and prob >= self.prob_positive_threshold:
+                if position == 0 and prob >= adjusted_prob_threshold.at[t]:
                     position = 1
+                    pred = 1
                     days_left = self.horizon - 1
-                elif position == 1 and prob < self.prob_positive_threshold:
+                elif position == 1 and prob < adjusted_prob_threshold.at[t]:
                     position = 0 #exit to flat
             positions.at[t] = position
             y_pred_series.at[t] = pred
