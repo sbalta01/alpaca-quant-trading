@@ -188,3 +188,11 @@ def atr(df: pd.DataFrame, window: int) -> pd.Series:
     tr3 = (low  - prev_close).abs()
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     return tr.rolling(window).mean()
+
+def threshold_adjust(factor: pd.Series, horizon: int = 10, base_threshold: float = 0.5, max_shift: float = 0.2):
+            short_vol = factor.rolling(horizon//2).std(ddof=1)
+            long_vol = factor.rolling(horizon).std(ddof=1)
+            ret_mean = factor.rolling(horizon).mean()
+            z = (short_vol - ret_mean)/(long_vol + 1e-8)
+            shift = max_shift * np.tanh(z)
+            return (base_threshold + shift).fillna(base_threshold).clip(0.0,1.0)
