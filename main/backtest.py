@@ -33,7 +33,9 @@ if __name__ == "__main__":
     # symbols = ["PFE"]
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
-    symbols = ["MRK"]
+    # symbols = ["MRK"]
+    # symbols = ["LMT"]
+    # symbols = ["WOLF"]
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    # symbols = fetch_nasdaq_100_symbols()
+    symbols = fetch_nasdaq_100_symbols()
 
     start   = datetime(2010, 10, 1)
     # start   = datetime(2025, 1, 5)
@@ -135,50 +137,53 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    # strat = XGBoostRegressionStrategy(
-    #     horizon = 20,
-    #     train_frac = 0.7,
-    #     cv_splits = 5,
-    #     rfecv_step = 0.1,
-    #     # pca_n_components = 25,
-    #     use_pca = False,
-    #     # param_grid = {
-    #     #     'model__n_estimators': [50, 100, 200],
-    #     #     'model__max_depth':    [3, 5, 7],
-    #     #     'model__learning_rate': [0.01, 0.1, 0.2],
-    #     #     'model__subsample':    [0.7, 1.0],
-    #     # },
-    #     signal_thresh = 0.05,
-    #     n_iter_search = 50
-    # )
+    strat = XGBoostRegressionStrategy(
+        horizon = 10,
+        train_frac = 0.7,
+        cv_splits = 5,
+        rfecv_step = 0.1,
+        n_models = 50,
+        bootstrap= 0.8,
+        signal_thresh = 0.0,
+        n_iter_search = 25,
+        min_features = 10, #Good to avoid killing too many
+        # objective = 'reg:squarederror',
+        objective = 'reg:quantileerror',
+        quantile = 0.4, #Quantile to fit for when objective is 'reg:quantileerror'. The lower the more confidence.
+        random_state = 48,
+        with_hyperparam_fit = False, #Seems a bit useless
+        with_feature_selection =True, #Could kill too many features but seems useful (prevent with min_features)
+        adjust_threshold = False,
+    )
 
     # strat = LSTMEventTechnicalStrategy(
-    #     horizon=20,        # predict horizon-day return
-    #     threshold=0.05,   # event = next-horizon-day log-return > threshold%
+    #     horizon=10,        # predict horizon-day return
+    #     threshold=0.05,   # event = next-horizon-day log-return > threshold
     #     train_frac = 0.7,
-    #     cv_splits = 2,
-    #     n_models = 10,
+    #     cv_splits = 2, #For optuna hyperparameter fitting
+    #     n_models = 5,
     #     bootstrap = 0.8,
     #     random_state=42,
-    #     # sequences_length = 20,
+    #     sequences_length = 25,
     #     prob_positive_threshold = 0.7,
     #     with_hyperparam_fit = True,
     #     with_feature_attn = False,
     #     with_pos_weight = True,
+    #     adjust_threshold = True,
     # )
 
-    strat = LSTMRegressionStrategy(
-        horizon=20,        # predict next horizon-day return
-        threshold=0.05,   # event = next-horizon-day log-return
-        train_frac = 0.7,
-        cv_splits = 5,
-        n_models = 5,
-        bootstrap = 0.7,
-        random_state=42,
-        # sequences_length = 20,
-        with_hyperparam_fit = True,
-        with_feature_attn = False,
-    )
+    # strat = LSTMRegressionStrategy(
+    #     horizon=20,        # predict next horizon-day return
+    #     threshold=0.05,   # allow only next-horizon-day log-return > threshold signals
+    #     train_frac = 0.7,
+    #     cv_splits = 5, #For optuna hyperparameter fitting
+    #     n_models = 5,
+    #     bootstrap = 0.7,
+    #     random_state=42,
+    #     # sequences_length = 20,
+    #     with_hyperparam_fit = True,
+    #     with_feature_attn = False,
+    # )
 
     start_backtest = time.perf_counter()
 
