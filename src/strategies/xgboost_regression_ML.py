@@ -5,16 +5,15 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any
 
-from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import (
-    RandomizedSearchCV, train_test_split, TimeSeriesSplit, GridSearchCV
-)
+from sklearn.model_selection import train_test_split, TimeSeriesSplit
 from sklearn.feature_selection import RFECV
 from sklearn.metrics import r2_score
 from xgboost import XGBRegressor
+from src.strategies.lstm_regression_ML import SequenceBaggingRegressor
 from src.utils.metrics import sharpe_scorer
+import optuna
 
 from src.strategies.base_strategy import Strategy
 from src.utils.tools import adx, ema, rsi, sma, threshold_adjust
@@ -35,74 +34,34 @@ class XGBoostRegressionStrategy(Strategy):
         horizon: int = 5,
         train_frac: float = 0.7,
         cv_splits: int = 5,
+        n_models: int = 1,
+        bootstrap: float = 0.8,
         rfecv_step: float = 0.1,
-        pca_n_components: float = 0.95,
-        param_grid: Dict[str, Any] = None,
         signal_thresh: float = 0.0, #Minimum daily return to trade
         random_state: int = 42,
         n_iter_search: int = 50,
-        with_pca: bool = True,
+        min_features: int = 1,
+        objective: str = 'reg:squarederror',
+        quantile: float = 0.2, #Quantile to fit for when objective is 'reg:quantileerror'
+        with_hyperparam_fit: bool = True,
         with_feature_selection: bool = True,
         adjust_threshold: bool = True,
     ):
         self.horizon = horizon
-        # train/test split fraction
         self.train_frac = train_frac
-        # time-series cross-validation folds
         self.cv_splits = cv_splits
-        # RFECV step size
+        self.n_models = n_models
+        self.bootstrap = bootstrap
         self.rfecv_step = rfecv_step
         self.random_state = random_state
-        self.pca_n_components= pca_n_components
         self.n_iter_search = n_iter_search
-        self.signal_thresh = np.log(signal_thresh + 1) #Consistent with log-target
-        self.with_pca = with_pca
+        self.min_features = min_features
+        self.with_hyperparam_fit = with_hyperparam_fit
         self.with_feature_selection = with_feature_selection
         self.adjust_threshold = adjust_threshold
-
-        # default hyperparameter grid for XGB
-        self.param_grid = param_grid or {
-            'model__n_estimators': randint(50, 500),
-            'model__max_depth': randint(1, 10),
-            'model__learning_rate': uniform(0.01, 2.0),
-            'model__subsample': uniform(0.5, 0.5), #loc, scale --> [loc,loc+scale]
-        }
-
-        # Build pipeline:
-        # 1) Standardize features
-        # 2) PCA
-        # 3) RFECV wrapped around a base XGBRegressor
-        # 4) Final XGBRegressor
-        steps = []
-        steps.append(('scaler', StandardScaler()))
-
-        if self.with_pca:
-            # If pca_n_components < 1.0, sklearn treats as fraction of variance
-            steps.append(('pca', PCA(n_components=self.pca_n_components, random_state=self.random_state)))
-            print("PCA enabled")
-
-        base = XGBRegressor(
-            objective='reg:squarederror',
-            random_state=self.random_state,
-            verbosity=0
-        )
-
-        if self.with_feature_selection:
-            inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
-            steps.append(('rfecv', RFECV(
-                estimator=base,
-                step=self.rfecv_step,
-                min_features_to_select=10,
-                cv=inner_cv,
-                scoring='r2',
-                n_jobs=-1
-            )))
-            print("Feature selection enabled")
-        else:
-            print("No feature selection")
-
-        steps.append(('model', base))
-        self.pipeline = Pipeline(steps)
+        self.signal_thresh = np.log(signal_thresh + 1) #Consistent with log-target
+        self.objective = objective
+        self.quantile = quantile
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -110,6 +69,13 @@ class XGBoostRegressionStrategy(Strategy):
         Expects df has columns: ['open','high','low','close','volume'].
         """
         df = df.copy()
+        idx = df.index
+
+        # --- Calendar data with cyclical embedding
+        df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
+        df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
+        df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
+        df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
 
         # --- Price & lag features ---
         df['logret'] = np.log(df['close'] / df['close'].shift(1))
@@ -119,17 +85,18 @@ class XGBoostRegressionStrategy(Strategy):
 
         # --- Volume features ---
         df['volume'] = df['volume']
-        df['volume_1'] = df['volume'].shift(1)
-        df['volume_inc'] = df['volume'] - df['volume_1']
+        # df['volume_1'] = df['volume'].shift(1)
+        df['volume_inc'] = df['volume'] - df['volume'].shift(1)
 
         # --- Moving Averages & their diffs ---
-        for w in (5,10,20,50):
+        # for w in (5,10,20,50):
+        for w in [self.horizon]:
             df[f'sma{w}']    = sma(df['close'], w)
-            df[f'sma{w}_1'] = df[f'sma{w}'].shift(1)
-            df[f'sma{w}_inc'] = df[f'sma{w}'] - df[f'sma{w}_1']
+            # df[f'sma{w}_1'] = df[f'sma{w}'].shift(1)
+            df[f'sma{w}_inc'] = df[f'sma{w}'] - df[f'sma{w}'].shift(1)
             df[f'ema{w}']    = ema(df['close'], w)
-            df[f'ema{w}_1'] = df[f'ema{w}'].shift(1)
-            df[f'ema{w}_inc'] = df[f'ema{w}'] - df[f'ema{w}_1']
+            # df[f'ema{w}_1'] = df[f'ema{w}'].shift(1)
+            df[f'ema{w}_inc'] = df[f'ema{w}'] - df[f'ema{w}'].shift(1)
 
         # --- RSI(14) ---
         df['RSI14'] = rsi(df['close'], 14)
@@ -138,15 +105,16 @@ class XGBoostRegressionStrategy(Strategy):
         df['OBV'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
 
         # --- ROC ---
-        for w in (5,10,20):
+        # for w in (5,10,20):
+        for w in [self.horizon]:
             df[f'ROC{w}'] = df['close'].pct_change(w)
 
         # --- MACD + Signal(9) + hist ---
-        df['ema12'] = ema(df['close'], 12)
-        df['ema26'] = ema(df['close'], 26)
-        df['macd']  = df['ema12'] - df['ema26']
-        df['macd_sig']  = ema(df['macd'], 9)
-        df['macd_hist'] = df['macd'] - df['macd_sig']
+        # df['ema12'] = ema(df['close'], 12)
+        # df['ema26'] = ema(df['close'], 26)
+        df['macd']  = ema(df['close'], 12) - ema(df['close'], 26)
+        # df['macd_sig']  = ema(df['macd'], 9)
+        df['macd_hist'] = df['macd'] - ema(df['macd'], 9)
 
         # --- Stochastic %K(3), %D(3) ---
         low3  = df['low'].rolling(3).min()
@@ -171,11 +139,105 @@ class XGBoostRegressionStrategy(Strategy):
         high26 = df['high'].rolling(26).max()
         low26  = df['low'].rolling(26).min()
         df['ichimoku_base'] = (high26 + low26) / 2
-        df['ichimoku_span_a'] = ((df['ichimoku_conv'] + df['ichimoku_base'])/2).shift(26)
-        high52 = df['high'].rolling(52).max()
-        low52  = df['low'].rolling(52).min()
-        df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
+        # df['ichimoku_span_a'] = ((df['ichimoku_conv'] + df['ichimoku_base'])/2).shift(26)
+        # high52 = df['high'].rolling(52).max()
+        # low52  = df['low'].rolling(52).min()
+        # df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
+
+        # Higher moments of log‑returns
+        df['skew5']    = df['logret'].rolling(self.horizon).skew()
+        df['kurt5']    = df['logret'].rolling(self.horizon).kurt()
         return df
+    
+    def _optimize_hyperparams_features(self, X_train_CV, y_train_CV):
+        """Use Optuna for hyperparameter fine tuning."""
+        def objective(trial):
+            n_estimators   = trial.suggest_int("n_estimators", 50, 500)
+            max_depth      = trial.suggest_int("max_depth",    1, 10)
+            learning_rate  = trial.suggest_float("learning_rate", 1e-3, 2.0, log=True)
+            subsample      = trial.suggest_float("subsample",     0.5, 1.0)
+            # build a temporary model + pipeline
+            model = XGBRegressor(
+                objective=self.objective,
+                quantile_alpha = self.quantile,
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                learning_rate=learning_rate,
+                subsample=subsample,
+
+                random_state=self.random_state,
+                verbosity=0,
+            )
+            pipe = Pipeline([
+            ('scaler', StandardScaler()),
+            ('model', model),
+                            ])
+            tscv = TimeSeriesSplit(n_splits=self.cv_splits)
+            # cross-validate with your sharpe_scorer
+            returns = []
+            for train_idx, val_idx in tscv.split(X_train_CV):
+                pipe.fit(X_train_CV.iloc[train_idx], y_train_CV.iloc[train_idx])
+                preds = pipe.predict(X_train_CV.iloc[val_idx])
+                # returns.append(r2_score(y_train_CV.iloc[val_idx], preds))
+                returns.append(sharpe_scorer(pipe, X_train_CV.iloc[val_idx], y_train_CV.iloc[val_idx]))
+            # maximize average Sharpe
+            return np.mean(returns)
+
+        if self.with_hyperparam_fit:
+            study = optuna.create_study(direction="maximize",
+                                        sampler=optuna.samplers.TPESampler(),
+                                        pruner=optuna.pruners.MedianPruner())
+            study.optimize(objective, n_trials=self.n_iter_search, timeout=3600,show_progress_bar=True,)
+            best_params = study.best_params
+            print("Best hyperparameters:", best_params)
+        else:
+            best_params = {"n_estimators":100,
+                           "max_depth":5,
+                           "learning_rate":1e-1,
+                           "subsample":0.7,
+                           }
+            print("No hyperparameter fitting")
+
+        if self.with_feature_selection:
+            print("Feature selection")
+            rfecv_model = XGBRegressor(
+                    objective=self.objective,
+                    quantile_alpha = self.quantile,
+                    n_estimators   = best_params["n_estimators"],
+                    max_depth      = best_params["max_depth"],
+                    learning_rate  = best_params["learning_rate"],
+                    subsample      = best_params["subsample"],
+                
+                    random_state   = self.random_state,
+                    verbosity      = 0,
+                )
+            inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
+            rfecv_pipe = Pipeline([
+            ('scaler', StandardScaler()),
+            ('rfecv', RFECV(
+                estimator=rfecv_model,
+                step=self.rfecv_step,
+                min_features_to_select=self.min_features,
+                cv=inner_cv,
+                scoring='r2',
+                # scoring='neg_mean_absolute_error',
+                n_jobs=1
+            )),
+            ('model', rfecv_model),
+                            ])
+            rfecv_pipe.fit(X_train_CV, y_train_CV)
+            support_mask = rfecv_pipe.named_steps['rfecv'].support_
+            feature_names = X_train_CV.columns
+            selected = feature_names[support_mask]
+            ranking = rfecv_pipe.named_steps['rfecv'].ranking_
+            print(f"[{self.name}] RFECV selected {len(selected)}/{len(feature_names)} features. Ranking:")
+            for feature_name, rank in zip(feature_names, ranking):
+                print(f"{feature_name:15s} → rank {rank}")
+        else:
+            selected = X_train_CV.columns
+            print("No feature selection. Number of features:", len(selected))
+
+        return best_params, selected
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -198,58 +260,48 @@ class XGBoostRegressionStrategy(Strategy):
             X, y, train_size=self.train_frac, shuffle=False
         )
 
-        # 4) Nested CV Grid Search/Randomized Search CV
-        outer_cv = TimeSeriesSplit(n_splits=self.cv_splits)
-        if isinstance(self.param_grid, dict) and all(
-            hasattr(v, "rvs") for v in self.param_grid.values()
-        ):
-            gs = RandomizedSearchCV(
-                estimator=self.pipeline,
-                param_distributions=self.param_grid,
-                n_iter=self.n_iter_search,
-                cv=outer_cv,
-                # scoring='r2',
-                scoring=sharpe_scorer,
-                random_state=self.random_state,
-                n_jobs=-1,
-                verbose=0,
-            )
-            print('Random Search CV')
-        else:
-            gs = GridSearchCV(
-            estimator=self.pipeline,
-            param_grid=self.param_grid,
-            cv=outer_cv,
-            # scoring='r2',
-            scoring=sharpe_scorer,
-            n_jobs=-1,
-            verbose=0,
-            )
-            print('Grid Search CV')
+        best_params, selected = self._optimize_hyperparams_features(X_train, y_train)
+        X_train = X_train[selected]
+        X_test = X_test[selected]
+            
+        self.model = XGBRegressor(
+                objective=self.objective,
+                quantile_alpha = self.quantile,
+                n_estimators   = best_params["n_estimators"],
+                max_depth      = best_params["max_depth"],
+                learning_rate  = best_params["learning_rate"],
+                subsample      = best_params["subsample"],
 
-        gs.fit(X_train, y_train)
-        best = gs.best_estimator_
+                # base_score      = float(y_train.mean()),
+                random_state   = self.random_state,
+                verbosity      = 0,
+            )
+        
+        self.pipeline = Pipeline([
+            ('scaler', StandardScaler()),
+            ('model', self.model),
+        ])
 
-        try:
-            support_mask = best.named_steps['rfecv'].support_
-            feature_names = X_train.columns
-            selected = feature_names[support_mask]
-            ranking = best.named_steps['rfecv'].ranking_
-            print(f"[{self.name}] RFECV selected {len(selected)}/{len(feature_names)} features. Ranking:")
-            for feature_name, rank in zip(feature_names, ranking):
-                print(f"{feature_name:15s} → rank {rank}")
-        except:
-            print('')
+        self.ensemble = SequenceBaggingRegressor(
+            base_estimator= self.pipeline,
+            n_estimators  = self.n_models,
+            max_samples   = self.bootstrap, # fraction bootstrap
+            random_state  = self.random_state
+        )
+
+        search = self.ensemble
+        # search = self.pipeline
+        search.fit(X_train, y_train)
 
         # 5) Evaluate R²
-        y_pred = pd.Series(best.predict(X_test), index=X_test.index)
+        y_pred = pd.Series(search.predict(X_test), index=X_test.index)
         
-        r2_train = r2_score(y_train, best.predict(X_train))
+        r2_train = r2_score(y_train, search.predict(X_train))
         r2_test = r2_score(y_test, y_pred)
         print(f"[{self.name}] R² score. Train: {r2_train:.3f}. Test: {r2_test:.3f}")
         
         # Directional accuracy: how often sign(pred) == sign(true)
-        dir_acc_train = (np.sign(y_train) == np.sign(best.predict(X_train))).mean()
+        dir_acc_train = (np.sign(y_train) == np.sign(search.predict(X_train))).mean()
         dir_acc_test = (np.sign(y_test) == np.sign(y_pred)).mean()
 
         print(f"Average directional accuracy (Train): {dir_acc_train:.3f}, (Test): {dir_acc_test:.3f}")
@@ -289,6 +341,9 @@ class XGBoostRegressionStrategy(Strategy):
             y_test_series.at[t] = test
             test_mask.at[t] = 1.0
         print('Max prediction', y_pred_series.max(),y_pred_series.idxmax())
+        print('Max label', y_test.max(),y_test.idxmax())
+        print('Min prediction', y_pred.min(),y_pred.idxmin())
+        print('Min label', y_test.min(),y_test.idxmin())
         # 7) Merge signals into df
         out = df.copy()
         out["position"] = positions
