@@ -250,7 +250,7 @@ class XGBoostRegressionStrategy(Strategy):
         # 1) Compute features + target (next-bar return)
         df['target'] = np.log(df['close'].shift(-self.horizon)/df['close'])
         feat = self._compute_features(df)
-        feat = feat.dropna()
+        feat = feat.ffill().dropna()  #Ffill so that we dont lose last rows to dropping Nas.
 
         # 3) Split train / test
         # X = feat.drop(columns=['target','close','high','low','open'])
