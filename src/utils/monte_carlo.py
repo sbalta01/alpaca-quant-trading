@@ -254,7 +254,7 @@ def monte_carlo_portfolio_risk(
     for i, seed in enumerate(seeds):
         r = np.random.RandomState(seed)
         position = r.uniform(low = 0, high = 1, size=n_assets)
-        position = position/np.sum(position)
+        position = position/np.sum(position) #Normalize as percentage of portfolio
         
         _, empirical, _ = run(r, position)
         
@@ -279,7 +279,7 @@ def monte_carlo_portfolio_risk(
         final_price=final_price,
     )
 
-    print('Besst position', best_position)
+    print('Best position', best_position)
     print(f'VaR {best_empirical["VaR"]:0.2%}')
 
     return {
