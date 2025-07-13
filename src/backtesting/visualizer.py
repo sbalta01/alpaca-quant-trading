@@ -35,7 +35,7 @@ def plot_returns(results: pd.DataFrame, results_control: pd.DataFrame, title: st
     ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
     fig.autofmt_xdate()
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 def plot_signals(
@@ -97,4 +97,4 @@ def plot_signals(
     ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
     fig.autofmt_xdate()
     plt.tight_layout()
-    plt.show()
+    # plt.show()
