@@ -165,8 +165,6 @@ def monte_carlo_portfolio_risk(
     trials: int = 1,
     random_state: int = 42,
     backtest : bool = False,
-    normalize: bool = True,
-    max_weight: float = None,  # e.g. 0.25 to cap any asset at 25%
 ):
     """
     End-to-end Monte Carlo GBM risk estimator.
