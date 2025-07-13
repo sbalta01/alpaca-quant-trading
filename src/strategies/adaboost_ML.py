@@ -6,12 +6,14 @@ import numpy as np
 from typing import Dict, Any
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.feature_selection import RFECV
+from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, TimeSeriesSplit, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.tree import DecisionTreeClassifier
 
 from src.strategies.base_strategy import Strategy
-from src.utils.tools import remove_outliers, sma, ema, rsi
+from src.utils.tools import remove_outliers, sma, ema, rsi, threshold_adjust
 
 class AdaBoostStrategy(Strategy):
     """
@@ -58,18 +60,22 @@ class AdaBoostStrategy(Strategy):
         self.ratio_outliers = ratio_outliers
         self.n_iter_search = n_iter_search
 
+        self.model = AdaBoostClassifier(
+            random_state=self.random_state
+            )
+
         #Pipeline: scale → RFECV(AdaBoost) (with inner CV) → final estimator
         inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
             ('rfecv', RFECV(
-                estimator=AdaBoostClassifier(random_state=self.random_state),
+                estimator=self.model,
                 step=0.1,            # remove 10% features each iteration
                 cv=inner_cv,
                 scoring='accuracy',
                 n_jobs=-1
             )),
-            ('clf', AdaBoostClassifier(random_state=self.random_state))
+            ('clf', self.model)
         ])
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -127,16 +133,16 @@ class AdaBoostStrategy(Strategy):
         mean_dev = tp.rolling(10).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
         df['CCI'] = (tp - ma_tp) / (0.015 * mean_dev)
 
-        return df.dropna() #Because of this there is a slight mismatch between start control and the start of the ML strat
+        return df
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         df = data.copy()
         # 1) Build features & target
         feat = self._compute_features(df)
         # target = sign of ΔMA(d)
-        feat['target'] = (feat[f'MA{self.d}'].shift(-1) > feat[f'MA{self.d}']).astype(int)
-        feat = feat.dropna() #Because of this there is a slight mismatch between start control and the start of the ML strat
+        feat['target'] = (feat[f'MA{self.d}'].shift(-1) > feat[f'MA{self.d}'])
         feat['target'] = feat['target'].astype(int)
+        feat = feat.ffill().dropna()  #Ffill so that we dont lose last rows to dropping Nas.
 
         # 2) Remove outliers
         feat = remove_outliers(feat, ratio_outliers=self.ratio_outliers)
@@ -185,20 +191,41 @@ class AdaBoostStrategy(Strategy):
 
         # 5) Evaluate on test
         y_pred = best.predict(X_test)
+        y_prob = best.predict_proba(X_test)[:, 1]
+        y_prob_train = best.predict_proba(X_train)[:, 1]
+
+
+        # 5) Final predictions on test history
+        auc_train  = roc_auc_score(y_train, y_prob_train)
+        auc_test  = roc_auc_score(y_test, y_prob)
+        print(f"ROC AUC (Train): {auc_train:.3f}, ROC AUC (Test): {auc_test:.3f}")
 
         # 6) Generate signals: only in test period
         positions = pd.Series(0.0, index=feat.index)
         y_test_series = pd.Series(0.0, index=feat.index)
         test_mask = pd.Series(0.0, index=feat.index)
         idxs = list(X_test.index)
-        for idx, pred, y in zip(idxs, y_pred, y_test):
-            positions.at[idx] = pred
+
+        self.prob_positive_threshold = 0.7
+        # y_prob = pd.Series(y_prob).rolling(3).mean() #Smooth the probabilities to avoid single-day flops
+        self.adjust_threshold = False
+        adjusted_prob_threshold = threshold_adjust(feat['close_inc'], horizon = self.d, base_threshold = 0.5, max_shift=0.2) if self.adjust_threshold else pd.Series(self.prob_positive_threshold, index = idxs)
+        position = 0
+
+        for idx, pred, prob, y in zip(idxs, y_pred, y_prob, y_test):
+            if position == 0 and prob >= adjusted_prob_threshold.at[idx]:
+                position = 1
+            elif position == 1 and prob < adjusted_prob_threshold.at[idx]:
+                position = 0 #exit to flat
+            positions.at[idx] = position
+
+            # positions.at[idx] = pred
             y_test_series.at[idx] = y
             test_mask.at[idx] = 1.0
         
         out = df.copy()
-        out["position"] = positions.reindex(df.index).fillna(0.0)
-        out['signal'] = out['position'].diff().fillna(0.0)
+        out["position"] = positions.reindex(df.index).ffill().bfill().clip(0,1)
+        out['signal'] = out['position'].diff().fillna(0.0).clip(-1,1)
         
         out["y_test"] = y_test_series.reindex(df.index).fillna(0.0)
         out["y_pred"] = out["position"].copy()
