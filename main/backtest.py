@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 
 from alpaca.data.timeframe import TimeFrame
+from matplotlib import pyplot as plt
 import pandas as pd
 
 from src.data.data_loader import fetch_nasdaq_100_symbols
@@ -34,7 +35,7 @@ if __name__ == "__main__":
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
     # symbols = ["MRK"]
-    # symbols = ["LMT"]
+    symbols = ["LMT"]
     # symbols = ["WOLF"]
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
@@ -51,12 +52,12 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    symbols = fetch_nasdaq_100_symbols()
+    # symbols = fetch_nasdaq_100_symbols()
 
     start   = datetime(2010, 10, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
-    # end     = datetime(2025, 1, 8)
+    # end     = datetime(2025, 2, 17)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
@@ -84,17 +85,17 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    predictor = AdaBoostStrategy(
-        d=10,
-        train_frac=0.7,
-        cv_splits=5,
-        param_grid={
-            'clf__n_estimators': [50,100,200],
-            'clf__learning_rate': [0.1,0.5,1.0]
-        },
-        # ratio_outliers = 1.75,
-        n_iter_search = 50
-    )
+    # predictor = AdaBoostStrategy(
+    #     d=10,
+    #     train_frac=0.7,
+    #     cv_splits=5,
+    #     param_grid={
+    #         'clf__n_estimators': [50,100,200],
+    #         'clf__learning_rate': [0.1,0.5,1.0]
+    #     },
+    #     # ratio_outliers = 1.75,
+    #     n_iter_search = 50
+    # )
     # strat = MomentumRankingAdaBoostStrategy(
     #     predictor=predictor,
     #     top_k=10,
@@ -137,40 +138,40 @@ if __name__ == "__main__":
     #     n_iter_search = 50
     # )
 
-    strat = XGBoostRegressionStrategy(
-        horizon = 10,
-        train_frac = 0.7,
-        cv_splits = 5,
-        rfecv_step = 0.1,
-        n_models = 50,
-        bootstrap= 0.8,
-        signal_thresh = 0.0,
-        n_iter_search = 25,
-        min_features = 10, #Good to avoid killing too many
-        # objective = 'reg:squarederror',
-        objective = 'reg:quantileerror',
-        quantile = 0.4, #Quantile to fit for when objective is 'reg:quantileerror'. The lower the more confidence.
-        random_state = 48,
-        with_hyperparam_fit = False, #Seems a bit useless
-        with_feature_selection =True, #Could kill too many features but seems useful (prevent with min_features)
-        adjust_threshold = False,
-    )
-
-    # strat = LSTMEventTechnicalStrategy(
-    #     horizon=10,        # predict horizon-day return
-    #     threshold=0.05,   # event = next-horizon-day log-return > threshold
+    # strat = XGBoostRegressionStrategy(
+    #     horizon = 10,
     #     train_frac = 0.7,
-    #     cv_splits = 2, #For optuna hyperparameter fitting
-    #     n_models = 5,
-    #     bootstrap = 0.8,
-    #     random_state=42,
-    #     sequences_length = 25,
-    #     prob_positive_threshold = 0.7,
-    #     with_hyperparam_fit = True,
-    #     with_feature_attn = False,
-    #     with_pos_weight = True,
-    #     adjust_threshold = True,
+    #     cv_splits = 5,
+    #     rfecv_step = 0.1,
+    #     n_models = 50,
+    #     bootstrap= 0.8,
+    #     signal_thresh = 0.0,
+    #     n_iter_search = 25,
+    #     min_features = 10, #Good to avoid killing too many
+    #     # objective = 'reg:squarederror',
+    #     objective = 'reg:quantileerror',
+    #     quantile = 0.4, #Quantile to fit for when objective is 'reg:quantileerror'. The lower the more confidence.
+    #     random_state = 48,
+    #     with_hyperparam_fit = False, #Seems a bit useless
+    #     with_feature_selection =True, #Could kill too many features but seems useful (prevent with min_features)
+    #     adjust_threshold = False,
     # )
+
+    strat = LSTMEventTechnicalStrategy(
+        horizon=10,        # predict horizon-day return
+        threshold=0.05,   # event = next-horizon-day log-return > threshold
+        train_frac = 0.7,
+        cv_splits = 2, #For optuna hyperparameter fitting
+        n_models = 5,
+        bootstrap = 0.8,
+        random_state=42,
+        sequences_length = 25,
+        prob_positive_threshold = 0.7,
+        with_hyperparam_fit = True, #Seems useful
+        with_feature_attn = False,  #Seems useless
+        with_pos_weight = True, #Crucial
+        adjust_threshold = True, #More appropriate but obv it is safer a higher flat threshold
+    )
 
     # strat = LSTMRegressionStrategy(
     #     horizon=20,        # predict next horizon-day return
@@ -212,3 +213,4 @@ if __name__ == "__main__":
         signal_col='signal',
         title=f"{strat.name} Signals on Price"
     )
+    plt.show()
