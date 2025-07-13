@@ -2,6 +2,8 @@
 
 import logging
 import math
+from pathlib import Path
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -117,6 +119,7 @@ class AttentionLSTMClassifier(nn.Module):
         self.with_feature_attn = with_feature_attn
 
     def forward(self, X):
+        self.lstm.flatten_parameters()
         if self.with_feature_attn:
             # 1) feature attention
             X_att   = self.feat_attn(X)                   # [B, T, F]
@@ -562,7 +565,9 @@ class LSTMEventTechnicalStrategy(Strategy):
         target = np.log(df['close'].shift(-self.horizon) / df['close'])
         df['event'] = (target > self.threshold).astype(int) #This will not affect the calculation of any feature, thus no leakage
         feat = self._compute_features(df)
-        feat = feat.dropna()  #This order (1st event, then features, then dropping na) prevents any misalignment
+        
+        #The order (1st event, then features, then dropping na) prevents any misalignment
+        feat = feat.ffill().dropna() #Ffill so that we dont lose last rows to dropping Nas.
 
         # 3) Split train / test
         X = feat.drop(columns=['event']) #Remove data leakage
@@ -589,7 +594,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         X_train, y_train, times_train = make_sequences(
             X_train_full, y_train_full, times_train_full)             
         X_test,  y_test,  times_test  = make_sequences(
-            X_test_full,  y_test_full,  times_test_full)              
+            X_test_full,  y_test_full,  times_test_full)
 
         X_train = X_train.astype(np.float32)
         X_test = X_test.astype(np.float32)
@@ -653,8 +658,8 @@ class LSTMEventTechnicalStrategy(Strategy):
             device              = self.device
         )
 
-        if len(np.unique(y_train)) < 2 or len(np.unique(y_test)) < 2:
-                    raise Exception("One class is not represented")
+        if len(np.unique(y_train)) < 2:
+            raise Exception("One class is not represented in the training set")
         
         self.pipeline = Pipeline([
             ('scale', TimeSeriesScaler(StandardScaler())),
@@ -668,12 +673,12 @@ class LSTMEventTechnicalStrategy(Strategy):
             max_samples=self.bootstrap,      # each bag sees max_samples% bootstrap
             random_state=self.random_state
         )
-        search = self.ensemble
-        search.fit(X_train, y_train)
+        self.final_model = self.ensemble
+        self.final_model.fit(X_train, y_train)
         
-        y_pred = search.predict(X_test)
-        y_prob = search.predict_proba(X_test)[:, 1]
-        y_prob_train = search.predict_proba(X_train)[:, 1]
+        y_pred = self.final_model.predict(X_test)
+        y_prob = self.final_model.predict_proba(X_test)[:, 1]
+        y_prob_train = self.final_model.predict_proba(X_train)[:, 1]
 
 
         # 5) Final predictions on test history
@@ -690,22 +695,24 @@ class LSTMEventTechnicalStrategy(Strategy):
         position = 0
         days_left = 0
         
-        adjusted_prob_threshold = threshold_adjust(feat['logret'], horizon = self.horizon, base_threshold = 0.5, max_shift=0.2) if self.adjust_threshold else pd.Series(self.prob_positive_threshold, index = times_test)
+        adjusted_prob_positive_threshold = threshold_adjust(feat['logret'], horizon = self.horizon, base_threshold = 0.5, max_shift=0.2) if self.adjust_threshold else pd.Series(self.prob_positive_threshold, index = times_test)
         
         y_prob = pd.Series(y_prob).rolling(self.horizon).mean() #Smooth the probabilities to avoid single-day flops
+        print(y_prob.max())
+        print(y_prob.min())
         for t, prob, test in zip(times_test, y_prob, y_test):
             pred = 0
             if days_left > 0:
                 days_left -= 1
-                if prob >= adjusted_prob_threshold.at[t]:
+                if prob >= adjusted_prob_positive_threshold.at[t]:
                     days_left += 1
                     pred = 1
             else:
-                if position == 0 and prob >= adjusted_prob_threshold.at[t]:
+                if position == 0 and prob >= adjusted_prob_positive_threshold.at[t]:
                     position = 1
                     pred = 1
                     days_left = self.horizon - 1
-                elif position == 1 and prob < adjusted_prob_threshold.at[t]:
+                elif position == 1 and prob < adjusted_prob_positive_threshold.at[t]:
                     position = 0 #exit to flat
             positions.at[t] = position
             y_pred_series.at[t] = pred
@@ -721,3 +728,51 @@ class LSTMEventTechnicalStrategy(Strategy):
         out["y_pred"] = y_pred_series.reindex(df.index).fillna(0.0)
         out["test_mask"] = test_mask.reindex(df.index).fillna(0.0)
         return out
+    
+    def fit_and_save(self, data: pd.DataFrame, model_path: str):
+        """
+        Train on all data up through 'yesterday', then serialize the fitted pipeline.
+        """
+        # 1) Generate signals _only_ for training
+        _ = self.generate_signals(data)
+        # 2) Now your self.final_model is trained on ALL available sequences.
+        # 3) Save it:
+        p = Path(model_path)
+        p.parent.mkdir(exist_ok=True, parents=False)
+        joblib.dump(self.final_model, str(p))
+        print(f"Saved model to {p}")
+
+    def load(self, model_path: str):
+        """Load a pipeline that was trained via .fit_and_save(...)"""
+        self.final_model = joblib.load(model_path)
+        print(f"Model loaded from {model_path}")
+
+    def predict_next(self, recent_data: pd.DataFrame) -> float:
+        """
+        recent_data: DataFrame of exactly `sequences_length` rows,
+                     in chronological order, up through yesterday's close.
+        Returns: probability of an event (buy) over the next horizon.
+        """
+        # 1) Compute features on the full window
+        feat = self._compute_features(recent_data).dropna()
+
+        times_full = list(feat.index)
+
+        
+        def make_sequences_X(X_arr, times_arr):
+                X_seqs, times = [], []
+                for i in range(len(X_arr) - self.sequences_length):
+                    X_seqs.append(X_arr[i : i + self.sequences_length])
+                    times.append(times_arr[i + self.sequences_length])
+                return np.stack(X_seqs), times        
+        X, times = make_sequences_X(feat, times_arr=times_full)
+
+        # 2) We only need the very last `sequences_length` rows of features
+        X = X[-1,:,:]  # shape: (seq_len, n_feats)
+        X = X[np.newaxis, :, :].astype(np.float32)  # → (1, seq_len, n_feats)
+        
+        time = times[-1]
+
+        # 3) Predict
+        prob = self.final_model.predict_proba(X)[0,1]
+        return prob, time
