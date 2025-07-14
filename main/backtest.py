@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
     # symbols = ["MSFT"]
     # symbols = ["ROP"]
     # symbols = ["AAPL","MSFT"]
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     # symbols = ["HAG.DE"]
     # symbols = ["RHM.DE"]
     # symbols = ["MRK"]
-    symbols = ["LMT"]
+    # symbols = ["LMT"]
     # symbols = ["WOLF"]
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
@@ -54,10 +54,10 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2010, 10, 1)
+    start   = datetime(2010, 7, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
-    # end     = datetime(2025, 2, 17)
+    # end     = datetime(2025, 6, 13)
     timeframe = TimeFrame.Day  # or pd.Timedelta(days=1)
 
     # strat = MovingAverageStrategy(short_window=9, long_window=14, angle_threshold_deg = 15.0, ma = 'ema',
