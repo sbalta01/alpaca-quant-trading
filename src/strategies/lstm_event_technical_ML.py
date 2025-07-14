@@ -458,10 +458,13 @@ class LSTMEventTechnicalStrategy(Strategy):
         # Higher moments of log‑returns
         df['skew5']    = df['logret'].rolling(self.horizon).skew()
         df['kurt5']    = df['logret'].rolling(self.horizon).kurt()
+        # df = df.drop(columns=['open','high','low','close','volume']) #Optionally drop these columns
         return df
 
     def hyperparameter_fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame):
         n_feats = X_train.shape[2]
+        if len(np.unique(y_train)) < 2:
+            raise ValueError("One class is not represented within the entire training set")
         naive_pos_weight = (len(y_train) - y_train.sum()) / y_train.sum() #0's/1's
         def objective(trial):
             # 1) Suggest hyperparameters
@@ -571,7 +574,6 @@ class LSTMEventTechnicalStrategy(Strategy):
 
         # 3) Split train / test
         X = feat.drop(columns=['event']) #Remove data leakage
-        # X = feat.drop(columns=['event','open','high','low','close','volume'])
         y = feat['event']
 
         split_index = int(len(feat) * self.train_frac)
@@ -659,7 +661,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         )
 
         if len(np.unique(y_train)) < 2:
-            raise Exception("One class is not represented in the training set")
+            raise Exception("One class is not represented within the entire training set")
         
         self.pipeline = Pipeline([
             ('scale', TimeSeriesScaler(StandardScaler())),
@@ -697,9 +699,9 @@ class LSTMEventTechnicalStrategy(Strategy):
         
         adjusted_prob_positive_threshold = threshold_adjust(feat['logret'], horizon = self.horizon, base_threshold = 0.5, max_shift=0.2) if self.adjust_threshold else pd.Series(self.prob_positive_threshold, index = times_test)
         
-        y_prob = pd.Series(y_prob).rolling(self.horizon).mean() #Smooth the probabilities to avoid single-day flops
-        print(y_prob.max())
-        print(y_prob.min())
+        #Smooth the probabilities to avoid single-day flops
+        y_prob = pd.Series(y_prob).rolling(3).mean()
+
         for t, prob, test in zip(times_test, y_prob, y_test):
             pred = 0
             if days_left > 0:
@@ -733,9 +735,110 @@ class LSTMEventTechnicalStrategy(Strategy):
         """
         Train on all data up through 'yesterday', then serialize the fitted pipeline.
         """
-        # 1) Generate signals _only_ for training
-        _ = self.generate_signals(data)
-        # 2) Now your self.final_model is trained on ALL available sequences.
+        df = data.copy()       
+
+        # 1) Compute features + target (next-bar return)
+        target = np.log(df['close'].shift(-self.horizon) / df['close'])
+        df['event'] = (target > self.threshold).astype(int) #This will not affect the calculation of any feature, thus no leakage
+        feat = self._compute_features(df)
+        
+        #The order (1st event, then features, then dropping na) prevents any misalignment
+        feat = feat.ffill().dropna() #Ffill so that we dont lose last rows to dropping Nas.
+
+        # 3) Split train / test
+        X_full = feat.drop(columns=['event']) #Remove data leakage
+        y_full = feat['event']
+
+        def make_sequences_X_y(X_arr, y_arr):
+            X_seqs, y_labels = [], []
+            for i in range(len(X_arr) - self.sequences_length):
+                X_seqs.append(X_arr[i : i + self.sequences_length])
+                y_labels.append(y_arr.iloc[i + self.sequences_length])
+            return np.stack(X_seqs), np.array(y_labels)
+        X, y = make_sequences_X_y(X_full,y_full)
+
+        X = X.astype(np.float32)
+        y = y.astype(np.float32)
+
+        n_feats = X.shape[2]
+
+        if self.with_hyperparam_fit:
+            best_params = self.hyperparameter_fit(X, y)
+            print("Best hyperparameters:", best_params)
+        else:
+            best_params = {"hidden_size":n_feats,
+                           "attn_dim":64,
+                           "dropout":0.3,
+                           "lr":1e-3,
+                           "batch_size":32,
+                           "max_epochs":10,
+                           "alpha":0.25,
+                           "gamma":1,
+                           }
+            print("No hyperparameter fitting")
+            if self.with_pos_weight:
+                best_params['pos_weight'] = (len(y) - y.sum()) / y.sum() #0's/1's
+            else:
+                best_params['pos_weight'] = 1.0
+        
+        self.net = NeuralNetClassifier(
+            module              = AttentionLSTMClassifier,
+            module__n_features  = n_feats,
+            module__hidden_size = best_params["hidden_size"],
+            module__attn_dim    = best_params["attn_dim"],
+            module__dropout     = best_params["dropout"],
+            module__with_feature_attn = self.with_feature_attn,
+
+            criterion           = FocalLoss(pos_weight = best_params['pos_weight'], alpha = best_params['alpha'], gamma=best_params['gamma']), ##Equivalent to weighted BCE with logits when alpha = 1.0, gamma = 0.0
+            optimizer           = Adam,
+            optimizer__weight_decay=1e-4, #L2 regularization
+            lr                  = best_params["lr"],
+
+            batch_size          = best_params["batch_size"],
+            max_epochs          = best_params["max_epochs"],
+            
+            iterator_train__shuffle = False,
+            train_split         = None,       # we’re doing final train on *all* data
+            callbacks = [
+                    ('early_stop',
+                        EarlyStopping(
+                                monitor='train_loss', 
+                                patience=3, 
+                                threshold=1e-4
+                                )),
+                    # ('lr_scheduler', 
+                        # LRScheduler(
+                        #         policy = 'CosineAnnealingLR',
+                        #         T_max  = 20
+                        #     )),
+                ],
+            verbose             = 0,
+            device              = self.device
+        )
+
+        if len(np.unique(y)) < 2:
+            raise Exception("One class is not represented within the entire training set")
+        
+        self.pipeline = Pipeline([
+            ('scale', TimeSeriesScaler(StandardScaler())),
+            ('clf', self.net)
+        ])
+
+        self.ensemble = SequenceBaggingClassifier(
+            base_estimator=self.pipeline,
+            n_estimators=self.n_models,
+            max_samples=self.bootstrap,      # each bag sees max_samples% bootstrap
+            random_state=self.random_state
+        )
+        self.final_model = self.ensemble
+        self.final_model.fit(X, y)
+        
+        y_prob = self.final_model.predict_proba(X)[:, 1]
+
+        # 5) Final predictions on test history
+        auc_train  = roc_auc_score(y, y_prob)
+        print(f"ROC AUC (Train): {auc_train:.3f}")
+
         # 3) Save it:
         p = Path(model_path)
         p.parent.mkdir(exist_ok=True, parents=False)
@@ -747,32 +850,37 @@ class LSTMEventTechnicalStrategy(Strategy):
         self.final_model = joblib.load(model_path)
         print(f"Model loaded from {model_path}")
 
-    def predict_next(self, recent_data: pd.DataFrame) -> float:
+    def predict_next(self, data: pd.DataFrame) -> float:
         """
         recent_data: DataFrame of exactly `sequences_length` rows,
                      in chronological order, up through yesterday's close.
         Returns: probability of an event (buy) over the next horizon.
         """
+        smoothing_window = 3
         # 1) Compute features on the full window
-        feat = self._compute_features(recent_data).dropna()
+        feat = self._compute_features(data)
+        feat = feat.dropna()
+        feat_last = feat.iloc[-self.sequences_length - 1 - smoothing_window + 1:] #Keep only those lines necessary to build the last #smoothing_window# sequences
+        time_last = list(feat_last.index)
 
-        times_full = list(feat.index)
-
-        
-        def make_sequences_X(X_arr, times_arr):
+        def make_sequences_X_times(X_arr, times_arr):
                 X_seqs, times = [], []
                 for i in range(len(X_arr) - self.sequences_length):
                     X_seqs.append(X_arr[i : i + self.sequences_length])
                     times.append(times_arr[i + self.sequences_length])
-                return np.stack(X_seqs), times        
-        X, times = make_sequences_X(feat, times_arr=times_full)
-
-        # 2) We only need the very last `sequences_length` rows of features
-        X = X[-1,:,:]  # shape: (seq_len, n_feats)
-        X = X[np.newaxis, :, :].astype(np.float32)  # → (1, seq_len, n_feats)
+                return np.stack(X_seqs), times
         
+        X, times = make_sequences_X_times(feat_last, times_arr=time_last) #X shape: (smoothing_window, seq_len, n_feats)
+        X = X.astype(np.float32)
         time = times[-1]
 
-        # 3) Predict
-        prob = self.final_model.predict_proba(X)[0,1]
-        return prob, time
+        # 2) Predict
+        probs = self.final_model.predict_proba(X)[:,1]
+
+        #Smooth the probabilities to avoid single-day flops
+        probs = pd.Series(probs).rolling(smoothing_window).mean()
+        prob = probs.iloc[-1]
+
+        adjusted_prob_positive_threshold = threshold_adjust(feat['logret'], horizon = self.horizon, base_threshold = 0.5, max_shift=0.2) if self.adjust_threshold else pd.Series(self.prob_positive_threshold, index = times)
+        position = (prob >= adjusted_prob_positive_threshold.at[time]).astype(np.int32)
+        return position, time
