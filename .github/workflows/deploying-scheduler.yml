@@ -1,11 +1,10 @@
 name: Trading Deploy
 run-name: ${{ github.actor }} is deploying a quant trading algorithm. 
 
-# on: workflow_dispatch
-
 on:
-  schedule: ##Opening times NYSE/NASDAC: 13:30-20:00 UTC
+  schedule: ##Opening times US market: 13:30-20:00 UTC
     - cron:  '30 13 * * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+  workflow_dispatch:        # Allows manual trigger
 
 jobs:
   trade:
@@ -31,11 +30,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      # - name: Install dependencies
+      #   run: pip install -r requirements.txt
 
-      - name: Deploy strategy
-        env:
-            PYTHONPATH: ${{ github.workspace }}
+      # - name: Deploy strategy
+      #   env:
+      #       PYTHONPATH: ${{ github.workspace }}
         
-        run: python main/deploy_AdaBoost.py
+      #   run: python main/deploy.py
+
+      - name: Send JSON as email body
+        uses: dawidd6/action-send-mail@v6
+        with:
+          # either via connection_url or broken-out parameters:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port:    ${{ secrets.SMTP_PORT }}
+          username:       ${{ secrets.SMTP_USERNAME }}
+          password:       ${{ secrets.SMTP_PASSWORD }}
+
+          subject:        "Daily JSON Report"
+          from:           ${{ secrets.SMTP_USERNAME }}
+          to:             ${{ secrets.SMTP_USERNAME }}
+
+          # key bit: load the entire JSON file as the e‑mail body
+          content_type:   text/plain
+          body:           file://trades_info.json
