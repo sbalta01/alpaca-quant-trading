@@ -57,7 +57,7 @@ def run_backtest_strategy(
         timeframe_yahoo = '1m'
     try:
         from src.data.data_loader import fetch_alpaca_data as fetch_data
-        jkandc
+        raise ValueError("Chose not to use Alpaca data")
         df = fetch_data(
         symbol=symbols,
         start=start,
