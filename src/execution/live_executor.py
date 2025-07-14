@@ -4,15 +4,25 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Union, List
 
+import numpy as np
 import pandas as pd
 
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
-from alpaca.data.timeframe import TimeFrame
+from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
+from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 from dotenv import load_dotenv
 import os
+
+import json
+import os
+
+# Define the path to your JSON file
+json_file_path = 'trades_info.json'
+with open(json_file_path, 'r') as file:
+    trades_info = json.load(file)
+
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
@@ -30,7 +40,6 @@ initial_cash = float(account.cash)
 initial_equity = float(account.equity)  # This includes cash + market value of positions
 
 tracker = LivePerformanceTracker(initial_cash, initial_equity)
-
 
 def run_live_strategy(
     strategy: Strategy,
@@ -58,28 +67,57 @@ def run_live_strategy(
     feed : str
     """
 
-    def trade(sig, symbol):
+    def trade(position, symbol, days_left):
         open_pos = trading_client.get_all_positions()
-        holding = any(p.symbol == symbol for p in open_pos)
-        qty = 0
-        if holding:
+        holding = any(p.symbol == symbol for p in open_pos) #Whether I own 'symbol'
+        # elapsed_open_days = np.inf #Initialize how long have I had this position open to infinity (to trade no matter what)
+        if holding:  #If I hold symbol, get my open position
             position = trading_client.get_open_position(symbol)
             qty = position.qty
             qty_available = position.qty_available
-        # 5) Act on signal
-        if sig == 1 and not holding: #I can't buy if I already own stock
+
+            # orders = trading_client.get_orders(filter=GetOrdersRequest(
+            #                                                             symbols=[symbol],
+            #                                                             side=OrderSide.BUY,
+            #                                                             status=QueryOrderStatus.CLOSED,
+            #                                                             limit=50,
+            #                                                         ))
+            # if orders: #if I hold, check when was the last buy
+            #     last = orders[0]
+            #     print(f"Last order for {last.symbol}:")
+            #     print(f"  · Side       : {last.side}")
+            #     print(f"  · Status     : {last.status}")
+            #     print(f"  · Filled     : {last.filled_at}")   # may be None if not filled
+            #     if last.filled_at is not None: #If the last buy was filled, save its date
+            #         last_trade_date = last.filled_at.date()
+            #         today = datetime.now().date()
+
+            #         # 3) Count business days (Mon–Fri)
+            #         trading_days = pd.bdate_range(start=last_trade_date, end=today)
+
+            #         # 4) Elapsed open‑market days **excluding** the day of last_buy itself
+            #         elapsed_open_days = len(trading_days) - 1
+
+            # else:
+            #     print(f"No orders found for {symbol}.")
+        else:
+            qty = 0
+
+        # Act on signal
+        if position == 1 and not holding:
             print(f"[{symbol}] BUY at {latest.name} price={latest.close:.2f}")
             order = MarketOrderRequest(
                 symbol=symbol,
                 # qty=1,
                 notional = cash_per_trade,
                 side=OrderSide.BUY,
-                time_in_force=TimeInForce.DAY #Operate during open hours or else cancel. GTC if I want good till canceled.
+                time_in_force=TimeInForce.DAY #Operate during open hours or else cancel. GTC if I want good till canceled. Fractional orders only in DAY.
             )
             trading_client.submit_order(order)
             tracker.record_trade(latest.name, symbol, 1, "buy", latest.close)
+            days_left = horizon - 1
 
-        elif sig == -1 and holding:
+        elif position == 0 and holding:
             print(f"[{symbol}] SELL at {latest.name} price={latest.close:.2f}")
             order = MarketOrderRequest(
                 symbol=symbol,
@@ -91,41 +129,112 @@ def run_live_strategy(
             tracker.record_trade(latest.name, symbol, 1, "sell", latest.close)
 
         else:
-            print(f"[{symbol}] No trade signal (signal={sig}, holding={holding}, qty={qty}).")
+            print(f"[{symbol}] No trade signal (Position={position}, Holding={holding}, Quantity={qty}).")
+        
+        return days_left
     running = True
     while running:
         now_utc = datetime.now(timezone.utc)
         start = now_utc - timedelta(minutes=lookback_minutes)
         print(f"\n[{now_utc.strftime('%Y-%m-%d %H:%M:%S')}] Fetching bars for {symbols}")
 
-        # end = datetime(2025,5,20,20,00,tzinfo=timezone.utc)
-        # start = end - timedelta(minutes=lookback_minutes)
+        if timeframe.unit_value == TimeFrameUnit.Month:
+            print('Timeframe set to Month')
+            timeframe_yahoo = '1mo'
+        elif timeframe.unit_value == TimeFrameUnit.Week:
+            print('Timeframe set to Week')
+            timeframe_yahoo = '1wk'
+        elif timeframe.unit_value == TimeFrameUnit.Day:
+            print('Timeframe set to Day')
+            timeframe_yahoo = '1d'
+        elif timeframe.unit_value == TimeFrameUnit.Hour:
+            print('Timeframe set to Hour')
+            timeframe_yahoo = '1h'
+        elif timeframe.unit_value == TimeFrameUnit.Minute:
+            print('Timeframe set to Minute')
+            timeframe_yahoo = '1m'
 
         # 1) Fetch timeframe bars via your data loader
-        bars = fetch_alpaca_data(
-            symbol=symbols,
-            start=start,
-            end=now_utc,
-            timeframe=timeframe
-        )
+        try:
+            from src.data.data_loader import fetch_alpaca_data as fetch_data
+            bars = fetch_data(
+                symbol=symbols,
+                start=start,
+                end=now_utc,
+                timeframe=timeframe,
+                feed = feed
+            )
+            print('USING ALPACA DATA')
+            us_market = True
+        except:
+            from src.data.data_loader import fetch_yahoo_data as fetch_data
+            timeframe = timeframe_yahoo
+            feed = None
+            bars = fetch_data(
+                symbol=symbols,
+                start=start,
+                end=now_utc,
+                timeframe=timeframe,
+                feed = feed
+            )
+            us_market = False
+            print('USING YAHOO DATA')
+
+        try: #Fetch strategy's horizon if it has one to hold position until horizon days have passed
+            horizon = strategy.horizon
+        except:
+            horizon = 0
+        
         if strategy.multi_symbol:
-            df = strategy.generate_signals(bars.copy())
-            for symbol, subdf in df.groupby(level="symbol"):
-                subdf = subdf.droplevel("symbol")
-                latest = subdf.iloc[-1]
-                sig = latest.signal  # +1 buy, -1 sell, 0 hold
-                trade(sig, symbol)
+            # df = strategy.generate_signals(bars.copy())
+            # for symbol, subdf in df.groupby(level="symbol"):
+            #     subdf = subdf.droplevel("symbol")
+            #     latest = subdf.iloc[-1]
+            #     position = latest.position  # 1 own, 0 flat
+            #     trade(position, symbol)
+            pass #Not done yet
         else:
             for symbol in symbols:
-                subdf = bars.xs(symbol, level="symbol")
-                subdf = strategy.generate_signals(subdf.copy())
-                latest = subdf.iloc[-1]
-                sig = latest.signal  # +1 buy, -1 sell, 0 hold
-                trade(sig, symbol)
+                days_left_key = f"days_left_{symbol}"
+                try:
+                    days_left = trades_info[days_left_key] #Get how many days left for next trade
+                except:
+                    days_left = 0 #No days left for next trade
 
-        open_positions = trading_client.get_all_positions()
-        tracker.update_equity(open_positions)
-        tracker.print_status()
+                subdf = bars.xs(symbol, level="symbol")
+                strategy.fit_and_save(subdf, f"models/{strategy.name}_{symbol}.pkl")
+                strategy.load(f"models/{strategy.name}_{symbol}.pkl")
+                position, timestamp = strategy.predict_next(subdf)
+                latest = subdf.iloc[-1]
+
+                if days_left > 0: #If days left then no trade
+                    days_left -= 1
+                    if position == 1: #If strategy predicts holding position, extend the number of days holding by one
+                        days_left += 1
+                else:
+                    if us_market:
+                        days_left = trade(position, symbol, days_left)
+                    else:
+                        print(f"{symbol}: Position:", position)
+                        if position == 1:
+                            days_left = horizon - 1
+                            #trigger email
+                        if position == 0:
+                            pass
+                        trades_info[f"position_{symbol}"] = int(position)
+                        print(f"Key 'position_{symbol}' updated with value: {int(position)}")
+
+                # Save the updated JSON back to the file
+                trades_info[days_left_key] = days_left
+                print(f"Key '{days_left_key}' updated with value: {days_left}")
+
+                with open(json_file_path, 'w') as file:
+                    json.dump(trades_info, file, indent=4)
+
+        if us_market:
+            open_positions = trading_client.get_all_positions()
+            tracker.update_equity(open_positions)
+            tracker.print_status()
 
         if interval_seconds is None:
             running = False
