@@ -47,7 +47,7 @@ jobs:
         
         run: python main/deploy.py
 
-      - name: 🔨 Commit & push changes
+      - name: Commit & push changes
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
