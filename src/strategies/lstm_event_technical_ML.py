@@ -607,8 +607,20 @@ class LSTMEventTechnicalStrategy(Strategy):
         # n_feats = 45
 
         if self.with_hyperparam_fit:
-            best_params = self.hyperparameter_fit(X_train, y_train)
-            print("Best hyperparameters:", best_params)
+            try:
+                best_params = self.hyperparameter_fit(X_train, y_train)
+                print("Best hyperparameters:", best_params)
+            except ValueError:
+                logging.warning(f"No successful trials; skipping best-parameter step.")
+                best_params = {"hidden_size":n_feats,
+                           "attn_dim":64,
+                           "dropout":0.3,
+                           "lr":1e-3,
+                           "batch_size":32,
+                           "max_epochs":10,
+                           "alpha":0.25,
+                           "gamma":1,
+                           }
         else:
             best_params = {"hidden_size":n_feats,
                            "attn_dim":64,
@@ -763,8 +775,20 @@ class LSTMEventTechnicalStrategy(Strategy):
         n_feats = X.shape[2]
 
         if self.with_hyperparam_fit:
-            best_params = self.hyperparameter_fit(X, y)
-            print("Best hyperparameters:", best_params)
+            try:
+                best_params = self.hyperparameter_fit(X, y)
+                print("Best hyperparameters:", best_params)
+            except ValueError:
+                logging.warning(f"No successful trials; skipping best-parameter step.")
+                best_params = {"hidden_size":n_feats,
+                           "attn_dim":64,
+                           "dropout":0.3,
+                           "lr":1e-3,
+                           "batch_size":32,
+                           "max_epochs":10,
+                           "alpha":0.25,
+                           "gamma":1,
+                           }
         else:
             best_params = {"hidden_size":n_feats,
                            "attn_dim":64,

@@ -27,8 +27,8 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
-    # symbols = ["MSFT"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    symbols = ["MSFT"]
     # symbols = ["ROP"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["PFE"]
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2010, 7, 1)
+    start   = datetime(2020, 7, 15)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 6, 13)
