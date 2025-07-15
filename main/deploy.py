@@ -40,7 +40,7 @@ if __name__ == "__main__":
         )
     
     #EU stocks
-    symbols = ["HAG.DE","RHM.DE","IDR.MC","ECR.MC"]
+    symbols = ["HAG.DE","RHM.DE","IDR.MC"]
     run_live_strategy(
         strat,
         symbols=symbols,

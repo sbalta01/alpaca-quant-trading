@@ -40,7 +40,7 @@ if __name__ == "__main__":
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
-    symbols = ["HAG.DE","RHM.DE","IDR.MC","ECR.MC"]
+    symbols = ["HAG.DE","RHM.DE","IDR.MC"]
     # symbols = ["NVDA"]
     # symbols = ["NDX"]
 
@@ -164,7 +164,7 @@ if __name__ == "__main__":
         cv_splits = 2, #For optuna hyperparameter fitting
         n_models = 5,
         bootstrap = 0.8,
-        random_state=42,
+        random_state=43,
         sequences_length = 25,
         prob_positive_threshold = 0.7,
         with_hyperparam_fit = True, #Seems useful

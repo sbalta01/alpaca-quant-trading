@@ -621,6 +621,10 @@ class LSTMEventTechnicalStrategy(Strategy):
                            "alpha":0.25,
                            "gamma":1,
                            }
+                if self.with_pos_weight:
+                    best_params['pos_weight'] = (len(y_train) - y_train.sum()) / y_train.sum() #0's/1's
+                else:
+                    best_params['pos_weight'] = 1.0
         else:
             best_params = {"hidden_size":n_feats,
                            "attn_dim":64,
@@ -789,6 +793,10 @@ class LSTMEventTechnicalStrategy(Strategy):
                            "alpha":0.25,
                            "gamma":1,
                            }
+                if self.with_pos_weight:
+                    best_params['pos_weight'] = (len(y) - y.sum()) / y.sum() #0's/1's
+                else:
+                    best_params['pos_weight'] = 1.0
         else:
             best_params = {"hidden_size":n_feats,
                            "attn_dim":64,
