@@ -54,7 +54,7 @@ jobs:
           git add trades_info.json live_trading_report.md
           # Only commit if there are changes
           if ! git diff --cached --quiet; then
-            git commit -m "🛠️ Auto-update trades_info.json"
+            git commit -m "Auto-update trades_info.json"
             git push
           else
             echo "No changes to commit."

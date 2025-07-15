@@ -218,10 +218,9 @@ def run_live_strategy(
                     days_left = 0 #No days left for next trade
 
                 subdf = bars.xs(symbol, level="symbol")
-                # strategy.fit_and_save(subdf, f"models/{strategy.name}_{symbol}.pkl")
-                # strategy.load(f"models/{strategy.name}_{symbol}.pkl")
-                # position, timestamp = strategy.predict_next(subdf)
-                position = 0
+                strategy.fit_and_save(subdf, f"models/{strategy.name}_{symbol}.pkl")
+                strategy.load(f"models/{strategy.name}_{symbol}.pkl")
+                position, timestamp = strategy.predict_next(subdf)
                 latest = subdf.iloc[-1]
 
                 if days_left > 0: #If days left then no trade
@@ -253,7 +252,6 @@ def run_live_strategy(
 
                 # Save the updated JSON back to the file
                 trades_info[days_left_key] = days_left
-
                 with open(json_file_path, 'w') as file:
                     json.dump(trades_info, file, indent=4)
 
