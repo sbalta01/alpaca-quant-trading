@@ -38,14 +38,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # - name: Install dependencies
-      #   run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-      # - name: Deploy strategy
-      #   env:
-      #       PYTHONPATH: ${{ github.workspace }}
+      - name: Deploy strategy
+        env:
+            PYTHONPATH: ${{ github.workspace }}
         
-      #   run: python main/deploy.py
+        run: python main/deploy.py
 
       - name: 🔨 Commit & push changes
         run: |
