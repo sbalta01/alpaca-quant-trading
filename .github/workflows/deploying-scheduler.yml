@@ -54,4 +54,4 @@ jobs:
 
           # key bit: load the entire JSON file as the e‑mail body
           content_type:   text/plain
-          body:           file://trades_info.json
+          body:           file://live_trading_report.md
