@@ -22,7 +22,7 @@ with open(json_file_path, 'r') as file:
     trades_info = json.load(file)
 
 md_report_file_path = "live_trading_report.md"
-open(md_report_file_path, "w", encoding="utf-8").close() #Clear file
+# open(md_report_file_path, "w", encoding="utf-8").close() #Clear file
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
