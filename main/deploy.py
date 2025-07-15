@@ -22,7 +22,7 @@ if __name__ == "__main__":
         random_state=42,
         sequences_length = 25,
         prob_positive_threshold = 0.7,
-        with_hyperparam_fit = False, #Seems useful
+        with_hyperparam_fit = True, #Seems useful
         with_feature_attn = False,  #Seems useless
         with_pos_weight = True, #Crucial
         adjust_threshold = True, #More appropriate but obv it is safer a higher flat threshold
