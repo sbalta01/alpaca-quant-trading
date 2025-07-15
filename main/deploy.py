@@ -8,8 +8,8 @@ if __name__ == "__main__":
     md_report_file_path = "live_trading_report.md"
     open(md_report_file_path, "w", encoding="utf-8").close() #Clear file
     #US stocks
-    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
-    symbols = ["MSFT"]
+    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    # symbols = ["MSFT"]
     # symbols = ["SPY"]
 
     strat = LSTMEventTechnicalStrategy(
