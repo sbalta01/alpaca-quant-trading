@@ -8,7 +8,8 @@ if __name__ == "__main__":
     md_report_file_path = "live_trading_report.md"
     open(md_report_file_path, "w", encoding="utf-8").close() #Clear file
     #US stocks
-    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    symbols = ["MSFT"]
     # symbols = ["SPY"]
 
     strat = LSTMEventTechnicalStrategy(
@@ -21,7 +22,7 @@ if __name__ == "__main__":
         random_state=42,
         sequences_length = 25,
         prob_positive_threshold = 0.7,
-        with_hyperparam_fit = True, #Seems useful
+        with_hyperparam_fit = False, #Seems useful
         with_feature_attn = False,  #Seems useless
         with_pos_weight = True, #Crucial
         adjust_threshold = True, #More appropriate but obv it is safer a higher flat threshold

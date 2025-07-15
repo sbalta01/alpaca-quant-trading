@@ -217,6 +217,7 @@ def run_live_strategy(
                 except:
                     days_left = 0 #No days left for next trade
 
+                print(subdf)
                 subdf = bars.xs(symbol, level="symbol")
                 strategy.fit_and_save(subdf, f"models/{strategy.name}_{symbol}.pkl")
                 strategy.load(f"models/{strategy.name}_{symbol}.pkl")

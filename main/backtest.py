@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # symbols = ["USO"]
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
-    symbols = ["MSFT"]
+    # symbols = ["MSFT"]
     # symbols = ["ROP"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["PFE"]
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
-    # symbols = ["HAG.DE","RHM.DE","IDR.MC","ECR.MC"]
+    symbols = ["HAG.DE","RHM.DE","IDR.MC","ECR.MC"]
     # symbols = ["NVDA"]
     # symbols = ["NDX"]
 
