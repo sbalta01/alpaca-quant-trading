@@ -1,1 +1,3 @@
-- [RHM.DE] MANUALLY BUY at 2025-07-14 00:00:00
+Live Trading results in market: XECB
+
+- [RHM.DE] No trade signal (Position=0, Holding=0).

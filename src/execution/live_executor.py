@@ -3,9 +3,8 @@
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Union, List
+import holidays
 
-import numpy as np
-import pandas as pd
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
@@ -14,9 +13,8 @@ from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 from dotenv import load_dotenv
 import os
-
 import json
-import os
+import sys
 
 # Define the path to your JSON file
 json_file_path = 'trades_info.json'
@@ -170,7 +168,7 @@ def run_live_strategy(
                 feed = feed
             )
             print('USING ALPACA DATA')
-            us_market = True
+            market = 'NYSE'
         except:
             from src.data.data_loader import fetch_yahoo_data as fetch_data
             timeframe = timeframe_yahoo
@@ -182,13 +180,26 @@ def run_live_strategy(
                 timeframe=timeframe,
                 feed = feed
             )
-            us_market = False
+            market = 'XECB'
             print('USING YAHOO DATA')
+
+        market_hols = holidays.financial_holidays(market)
+        today = now_utc.date()
+        if today.weekday() >= 5:
+            print("Today is weekend; exiting.")
+            sys.exit(0)
+        if today in market_hols:
+            print(f"Today is a holiday; exiting.")
+            sys.exit(0)
+        print("Business day; continuing with the rest of the workflow.")
 
         try: #Fetch strategy's horizon if it has one to hold position until horizon days have passed
             horizon = strategy.horizon
         except:
             horizon = 0
+
+        with open(md_report_file_path, "a", encoding="utf-8") as md_file:
+            md_file.write(f"Live Trading results in market: {market}\n\n")
         
         if strategy.multi_symbol:
             # df = strategy.generate_signals(bars.copy())
@@ -220,9 +231,9 @@ def run_live_strategy(
                     report = f"[{symbol}] Holding position. Days left = {days_left}."
                     print(report)
                 else:
-                    if us_market:
+                    if market == 'NYSE':
                         days_left, report = trade(position, symbol, days_left)
-                    else:
+                    elif market == 'XECB':
                         try:
                             holding = trades_info[f"position_{symbol}"]
                         except:
@@ -249,7 +260,7 @@ def run_live_strategy(
                 with open(md_report_file_path, "a", encoding="utf-8") as md_file:
                     md_file.write(f"- {report}\n")
 
-        if us_market:
+        if market == 'NYSE':
             open_positions = trading_client.get_all_positions()
             tracker.update_equity(open_positions)
             tracker.print_status()
