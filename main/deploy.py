@@ -5,8 +5,8 @@ from src.execution.live_executor import run_live_strategy
 
 if __name__ == "__main__":
     # symbols = ["AAPL", "MSFT"]
-    symbols = ["RHM.DE"]
-    # symbols = ["SPY"]
+    # symbols = ["RHM.DE"]
+    symbols = ["SPY"]
 
     strat = LSTMEventTechnicalStrategy(
         horizon=10,        # predict horizon-day return

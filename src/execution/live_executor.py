@@ -221,7 +221,7 @@ def run_live_strategy(
                 # strategy.fit_and_save(subdf, f"models/{strategy.name}_{symbol}.pkl")
                 # strategy.load(f"models/{strategy.name}_{symbol}.pkl")
                 # position, timestamp = strategy.predict_next(subdf)
-                position = 0
+                position = 1
                 latest = subdf.iloc[-1]
 
                 if days_left > 0: #If days left then no trade
