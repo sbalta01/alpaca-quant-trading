@@ -30,8 +30,29 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # - name: Install dependencies
-      #   run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check for holiday/weekend
+        id: bizday-check
+        run: |
+          python - << 'EOF'
+              import datetime, sys
+              import holidays
+
+              # choose your country (e.g. 'ES' for Spain, 'US' for United States, etc.)
+              country_hols = holidays.CountryHoliday('US')
+
+              today = datetime.date.today()
+              if today.weekday() >= 5:
+                  print("⚠️ Today is weekend; exiting.")
+                  sys.exit(0)
+              if today in country_hols or False:
+                  print(f"⚠️ Today ({today}) is a holiday ({country_hols[today]}); exiting.")
+                  sys.exit(0)
+
+              print("✅ Business day; continuing with the rest of the workflow.")
+              EOF
 
       # - name: Deploy strategy
       #   env:
@@ -39,7 +60,7 @@ jobs:
         
       #   run: python main/deploy.py
 
-      - name: Send JSON as email body
+      - name: Send report as email body
         uses: dawidd6/action-send-mail@v6
         with:
           # either via connection_url or broken-out parameters:
@@ -48,7 +69,7 @@ jobs:
           username:       ${{ secrets.SMTP_USERNAME }}
           password:       ${{ secrets.SMTP_PASSWORD }}
 
-          subject:        "Daily JSON Report"
+          subject:        "Daily Live Trading Report"
           from:           ${{ secrets.SMTP_USERNAME }}
           to:             ${{ secrets.SMTP_USERNAME }}
 

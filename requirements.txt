@@ -21,3 +21,4 @@ sb3-contrib
 tqdm
 rich
 optuna
+holidays
