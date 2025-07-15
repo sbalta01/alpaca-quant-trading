@@ -23,6 +23,9 @@ json_file_path = 'trades_info.json'
 with open(json_file_path, 'r') as file:
     trades_info = json.load(file)
 
+md_report_file_path = "live_trading_report.md"
+open(md_report_file_path, "w", encoding="utf-8").close() #Clear file
+
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
@@ -105,7 +108,8 @@ def run_live_strategy(
 
         # Act on signal
         if position == 1 and not holding:
-            print(f"[{symbol}] BUY at {latest.name} price={latest.close:.2f}")
+            report = f"[{symbol}] BUY at {latest.name} price={latest.close:.2f}"
+            print(report)
             order = MarketOrderRequest(
                 symbol=symbol,
                 # qty=1,
@@ -118,7 +122,8 @@ def run_live_strategy(
             days_left = horizon - 1
 
         elif position == 0 and holding:
-            print(f"[{symbol}] SELL at {latest.name} price={latest.close:.2f}")
+            report = f"[{symbol}] SELL at {latest.name} price={latest.close:.2f}"
+            print(report)
             order = MarketOrderRequest(
                 symbol=symbol,
                 qty=qty_available, #Sell all shares owned
@@ -127,11 +132,11 @@ def run_live_strategy(
             )
             trading_client.submit_order(order)
             tracker.record_trade(latest.name, symbol, 1, "sell", latest.close)
-
         else:
-            print(f"[{symbol}] No trade signal (Position={position}, Holding={holding}, Quantity={qty}).")
-        
-        return days_left
+            report = f"[{symbol}] No trade signal (Position={position}, Holding={holding}, Quantity={qty})."
+            print(report)
+        return days_left, report
+    
     running = True
     while running:
         now_utc = datetime.now(timezone.utc)
@@ -202,34 +207,47 @@ def run_live_strategy(
                     days_left = 0 #No days left for next trade
 
                 subdf = bars.xs(symbol, level="symbol")
-                strategy.fit_and_save(subdf, f"models/{strategy.name}_{symbol}.pkl")
-                strategy.load(f"models/{strategy.name}_{symbol}.pkl")
-                position, timestamp = strategy.predict_next(subdf)
+                # strategy.fit_and_save(subdf, f"models/{strategy.name}_{symbol}.pkl")
+                # strategy.load(f"models/{strategy.name}_{symbol}.pkl")
+                # position, timestamp = strategy.predict_next(subdf)
+                position = 1
                 latest = subdf.iloc[-1]
 
                 if days_left > 0: #If days left then no trade
                     days_left -= 1
                     if position == 1: #If strategy predicts holding position, extend the number of days holding by one
                         days_left += 1
+                    report = f"[{symbol}] Holding position. Days left = {days_left}."
+                    print(report)
                 else:
                     if us_market:
-                        days_left = trade(position, symbol, days_left)
+                        days_left, report = trade(position, symbol, days_left)
                     else:
-                        print(f"{symbol}: Position:", position)
-                        if position == 1:
+                        try:
+                            holding = trades_info[f"position_{symbol}"]
+                        except:
+                            holding = 0
+                        if position == 1 and holding == 0:
+                            report = f"[{symbol}] MANUALLY BUY at {latest.name}"
+                            print(report)
                             days_left = horizon - 1
-                            #trigger email
-                        if position == 0:
-                            pass
-                        trades_info[f"position_{symbol}"] = int(position)
-                        print(f"Key 'position_{symbol}' updated with value: {int(position)}")
+                            trades_info[f"position_{symbol}"] = int(position)
+                        elif position == 0 and holding == 1:
+                            report = f"[{symbol}] MANUALLY SELL at {latest.name}"
+                            print(report)
+                            trades_info[f"position_{symbol}"] = int(position)
+                        else:
+                            report = f"[{symbol}] No trade signal (Position={position}, Holding={holding})."
+                            print(report)
 
                 # Save the updated JSON back to the file
                 trades_info[days_left_key] = days_left
-                print(f"Key '{days_left_key}' updated with value: {days_left}")
 
                 with open(json_file_path, 'w') as file:
                     json.dump(trades_info, file, indent=4)
+
+                with open(md_report_file_path, "a", encoding="utf-8") as md_file:
+                    md_file.write(f"- {report}\n")
 
         if us_market:
             open_positions = trading_client.get_all_positions()
