@@ -10,7 +10,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin, clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import precision_score, recall_score, roc_auc_score
+from sklearn.metrics import precision_score, recall_score, roc_auc_score, accuracy_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.feature_selection import f_classif
 
@@ -100,7 +100,7 @@ class AttentionLSTMClassifier(nn.Module):
     3) Temporal attention over the LSTM outputs
     4) Final Dense → logit
     """
-    def __init__(self, n_features, with_feature_attn: bool, hidden_size=128, dropout=0.2, attn_dim = 64,):
+    def __init__(self, n_features, with_feature_attn: bool, hidden_size=32, dropout=0.2, attn_dim = 16,):
         super().__init__()
         self.feat_attn = DynamicFeatureAttention(n_features, attn_dim=attn_dim)
         self.lstm      = nn.LSTM(
@@ -132,10 +132,9 @@ class AttentionLSTMClassifier(nn.Module):
             return self.out(c).squeeze(-1)                # [B]
         else: #No attention layers
             H, _     = self.lstm(X)                   # H: [B, T, hidden]
-            h = H[:, -1, :]                  # [B, hidden]
-            h = self.drop(h)
-            return self.out(h).squeeze(-1)
-
+            h = H[:, -1, :]                  # [B, hidden] #Returns sequences = False (Keep the last value of each sequence only, for steps after LSTM)
+            h = self.drop(h)                 # [B, 1]
+            return self.out(h).squeeze(-1) # [B]
 
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -382,32 +381,25 @@ class LSTMEventTechnicalStrategy(Strategy):
         df = df.copy()
         idx = df.index
 
-        # --- Calendar data with cyclical embedding
-        df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
-        df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
-        df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
-        df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
+        # # --- Calendar data with cyclical embedding
+        # df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
+        # df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
+        # df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
+        # df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
 
         # --- Price & lag features ---
         df['logret'] = np.log(df['close'] / df['close'].shift(1))
-        df[f'vol{self.horizon}'] = df['logret'].rolling(self.horizon).std()
         df[f'logret{self.horizon}'] = np.log(df['close'] / df['close'].shift(self.horizon))
 
 
         # --- Volume features ---
         df['volume'] = df['volume']
-        # df['volume_1'] = df['volume'].shift(1)
         df['volume_inc'] = df['volume'] - df['volume'].shift(1)
 
         # --- Moving Averages & their diffs ---
-        # for w in (5,10,20,50):
-        for w in [self.horizon]:
+        for w in (5,20,50):
             df[f'sma{w}']    = sma(df['close'], w)
-            # df[f'sma{w}_1'] = df[f'sma{w}'].shift(1)
-            df[f'sma{w}_inc'] = df[f'sma{w}'] - df[f'sma{w}'].shift(1)
             df[f'ema{w}']    = ema(df['close'], w)
-            # df[f'ema{w}_1'] = df[f'ema{w}'].shift(1)
-            df[f'ema{w}_inc'] = df[f'ema{w}'] - df[f'ema{w}'].shift(1)
 
         # --- RSI(14) ---
         df['RSI14'] = rsi(df['close'], 14)
@@ -415,14 +407,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         # --- OBV ---
         df['OBV'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
 
-        # --- ROC ---
-        # for w in (5,10,20):
-        for w in [self.horizon]:
-            df[f'ROC{w}'] = df['close'].pct_change(w)
-
         # --- MACD + Signal(9) + hist ---
-        # df['ema12'] = ema(df['close'], 12)
-        # df['ema26'] = ema(df['close'], 26)
         df['macd']  = ema(df['close'], 12) - ema(df['close'], 26)
         # df['macd_sig']  = ema(df['macd'], 9)
         df['macd_hist'] = df['macd'] - ema(df['macd'], 9)
@@ -433,32 +418,35 @@ class LSTMEventTechnicalStrategy(Strategy):
         df['sto_k'] = 100 * (df['close'] - low3) / (high3 - low3)
         df['sto_d'] = df['sto_k'].rolling(3).mean()
 
-        # --- CCI(10) ---
-        tp = (df['high'] + df['low'] + df['close']) / 3
-        ma_tp = tp.rolling(10).mean()
-        md = tp.rolling(10).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
-        df['CCI10'] = (tp - ma_tp) / (0.015 * md)
+        # # --- CCI(10) ---
+        # tp = (df['high'] + df['low'] + df['close']) / 3
+        # ma_tp = tp.rolling(10).mean()
+        # md = tp.rolling(10).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
+        # df['CCI10'] = (tp - ma_tp) / (0.015 * md)
 
         # --- ADX(14) ---
-        df["adx"] = adx(df["high"], df["low"], df["close"], window=14)
+        df["adx_14"] = adx(df["high"], df["low"], df["close"], window=14)
 
-        # --- Ichimoku Cloud ---
-        # Conversion line (9), Base line (26), Leading Span A/B (26/52)
-        high9  = df['high'].rolling(9).max()
-        low9   = df['low'].rolling(9).min()
-        df['ichimoku_conv'] = (high9 + low9) / 2
-        high26 = df['high'].rolling(26).max()
-        low26  = df['low'].rolling(26).min()
-        df['ichimoku_base'] = (high26 + low26) / 2
-        # df['ichimoku_span_a'] = ((df['ichimoku_conv'] + df['ichimoku_base'])/2).shift(26)
-        # high52 = df['high'].rolling(52).max()
-        # low52  = df['low'].rolling(52).min()
-        # df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
+        # # --- Ichimoku Cloud --- #Looks as if it overfits heavily with these features (tested on NVDA 2020-25)
+        # # Conversion line (9), Base line (26), Leading Span A/B (26/52)
+        # high9  = df['high'].rolling(9).max()
+        # low9   = df['low'].rolling(9).min()
+        # df['ichimoku_conv'] = (high9 + low9) / 2
+        # high26 = df['high'].rolling(26).max()
+        # low26  = df['low'].rolling(26).min()
+        # df['ichimoku_base'] = (high26 + low26) / 2
+        # # df['ichimoku_span_a'] = ((df['ichimoku_conv'] + df['ichimoku_base'])/2).shift(26)
+        # # high52 = df['high'].rolling(52).max()
+        # # low52  = df['low'].rolling(52).min()
+        # # df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
 
-        # Higher moments of log‑returns
-        df['skew5']    = df['logret'].rolling(self.horizon).skew()
-        df['kurt5']    = df['logret'].rolling(self.horizon).kurt()
+        # # Higher moments of log‑returns #Looks as if it overfits heavily with these features (tested on NVDA 2020-25)
+        # df['skew5']    = df['logret'].rolling(self.horizon).skew()
+        # df['kurt5']    = df['logret'].rolling(self.horizon).kurt()
+        
+        
         # df = df.drop(columns=['open','high','low','close','volume']) #Optionally drop these columns
+        df = df.drop(columns=['open','high','low']) #Optionally drop these columns
         return df
 
     def hyperparameter_fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame):
@@ -604,6 +592,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         y_test = y_test.astype(np.float32)
 
         n_feats = X_train.shape[2]
+        print(n_feats)
         # n_feats = 45
 
         if self.with_hyperparam_fit:
@@ -613,7 +602,7 @@ class LSTMEventTechnicalStrategy(Strategy):
             except ValueError:
                 logging.warning(f"No successful trials; skipping best-parameter step.")
                 best_params = {"hidden_size":n_feats,
-                           "attn_dim":64,
+                           "attn_dim":16,
                            "dropout":0.3,
                            "lr":1e-3,
                            "batch_size":32,
@@ -700,6 +689,14 @@ class LSTMEventTechnicalStrategy(Strategy):
 
 
         # 5) Final predictions on test history
+        prec_train = precision_score(y_train, self.final_model.predict(X_train))
+        prec_test = precision_score(y_test, y_pred)
+        print(f"Precision (Train): {prec_train:.3f}, Precision (Test): {prec_test:.3f}")
+
+        acc_train = accuracy_score(y_train, self.final_model.predict(X_train))
+        acc_test = accuracy_score(y_test, y_pred)
+        print(f"Accuracy (Train): {acc_train:.3f}, Accuracy (Test): {acc_test:.3f}")
+
         auc_train  = roc_auc_score(y_train, y_prob_train)
         auc_test  = roc_auc_score(y_test, y_prob)
         print(f"ROC AUC (Train): {auc_train:.3f}, ROC AUC (Test): {auc_test:.3f}")
