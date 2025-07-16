@@ -160,6 +160,7 @@ def run_live_strategy(
         # 1) Fetch timeframe bars via your data loader
         try:
             from src.data.data_loader import fetch_alpaca_data as fetch_data
+            lmkdscsa
             bars = fetch_data(
                 symbol=symbols,
                 start=start,
@@ -180,7 +181,8 @@ def run_live_strategy(
                 timeframe=timeframe,
                 feed = feed
             )
-            market = 'XECB'
+            market = 'NYSE'
+            # market = 'XECB'
             print('USING YAHOO DATA')
 
         market_hols = holidays.financial_holidays(market)
