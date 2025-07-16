@@ -27,8 +27,9 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG","NVDA", "VRTX"]
     # symbols = ["MSFT"]
+    symbols = ["NVDA"]
     # symbols = ["ROP"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["PFE"]
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     # symbols = ["IDR.MC"]
     # symbols = ["SATS"]
     # symbols = ["ECR.MC"]
-    symbols = ["HAG.DE","RHM.DE","IDR.MC"]
+    # symbols = ["HAG.DE","RHM.DE","IDR.MC"]
     # symbols = ["NVDA"]
     # symbols = ["NDX"]
 
@@ -54,7 +55,7 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2020, 7, 15)
+    start   = datetime(2020, 7, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 6, 13)
@@ -162,9 +163,9 @@ if __name__ == "__main__":
         threshold=0.05,   # event = next-horizon-day log-return > threshold
         train_frac = 0.7,
         cv_splits = 2, #For optuna hyperparameter fitting
-        n_models = 5,
+        n_models = 10,
         bootstrap = 0.8,
-        random_state=43,
+        random_state=42,
         sequences_length = 25,
         prob_positive_threshold = 0.7,
         with_hyperparam_fit = True, #Seems useful
