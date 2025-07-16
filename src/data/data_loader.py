@@ -72,6 +72,7 @@ def fetch_alpaca_data(
         timeframe=timeframe,
         start=start,
         end=end,
+        adjustment="all", #Adjust data to splits (repricing stocks) and dividends
         feed = feed #Defaults IEX (free plan)
     )
     bars = client.get_stock_bars(req).df
