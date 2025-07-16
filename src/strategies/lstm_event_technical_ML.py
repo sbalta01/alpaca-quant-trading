@@ -379,13 +379,6 @@ class LSTMEventTechnicalStrategy(Strategy):
         Expects df has columns: ['open','high','low','close','volume'].
         """
         df = df.copy()
-        idx = df.index
-
-        # # --- Calendar data with cyclical embedding
-        # df["dow_sin"] = np.sin(2 * np.pi * idx.dayofweek   / 7)
-        # df["dow_cos"] = np.cos(2 * np.pi * idx.dayofweek   / 7)
-        # df["mo_sin"]  = np.sin(2 * np.pi * (idx.month - 1) / 12)
-        # df["mo_cos"]  = np.cos(2 * np.pi * (idx.month - 1) / 12)
 
         # --- Price & lag features ---
         df['logret'] = np.log(df['close'] / df['close'].shift(1))
@@ -409,7 +402,6 @@ class LSTMEventTechnicalStrategy(Strategy):
 
         # --- MACD + Signal(9) + hist ---
         df['macd']  = ema(df['close'], 12) - ema(df['close'], 26)
-        # df['macd_sig']  = ema(df['macd'], 9)
         df['macd_hist'] = df['macd'] - ema(df['macd'], 9)
 
         # --- Stochastic %K(3), %D(3) ---
@@ -418,32 +410,76 @@ class LSTMEventTechnicalStrategy(Strategy):
         df['sto_k'] = 100 * (df['close'] - low3) / (high3 - low3)
         df['sto_d'] = df['sto_k'].rolling(3).mean()
 
-        # # --- CCI(10) ---
-        # tp = (df['high'] + df['low'] + df['close']) / 3
-        # ma_tp = tp.rolling(10).mean()
-        # md = tp.rolling(10).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
-        # df['CCI10'] = (tp - ma_tp) / (0.015 * md)
-
         # --- ADX(14) ---
         df["adx_14"] = adx(df["high"], df["low"], df["close"], window=14)
 
-        # # --- Ichimoku Cloud --- #Looks as if it overfits heavily with these features (tested on NVDA 2020-25)
-        # # Conversion line (9), Base line (26), Leading Span A/B (26/52)
-        # high9  = df['high'].rolling(9).max()
-        # low9   = df['low'].rolling(9).min()
-        # df['ichimoku_conv'] = (high9 + low9) / 2
-        # high26 = df['high'].rolling(26).max()
-        # low26  = df['low'].rolling(26).min()
-        # df['ichimoku_base'] = (high26 + low26) / 2
-        # # df['ichimoku_span_a'] = ((df['ichimoku_conv'] + df['ichimoku_base'])/2).shift(26)
-        # # high52 = df['high'].rolling(52).max()
-        # # low52  = df['low'].rolling(52).min()
-        # # df['ichimoku_span_b'] = ((high52 + low52)/2).shift(26)
+        # Price‑Volume clusters: rolling VWAP deviation
+        vwap = (df['close'] * df['volume']).cumsum() / df['volume'].cumsum()
+        df['vwap_dev'] = (df['close'] - vwap) / vwap
 
-        # # Higher moments of log‑returns #Looks as if it overfits heavily with these features (tested on NVDA 2020-25)
-        # df['skew5']    = df['logret'].rolling(self.horizon).skew()
-        # df['kurt5']    = df['logret'].rolling(self.horizon).kurt()
-        
+
+        # # Bollinger Band Width
+        # bb_mid   = df['close'].rolling(20).mean()
+        # bb_std   = df['close'].rolling(20).std()
+        # bb_upper = bb_mid + 2 * bb_std
+        # bb_lower = bb_mid - 2 * bb_std
+        # df['bb_width'] = (bb_upper - bb_lower) / bb_mid
+
+        # # Average True Range (ATR)
+        # high_low    = df['high'] - df['low']
+        # high_close1 = np.abs(df['high'] - df['close'].shift(1))
+        # low_close1  = np.abs(df['low']  - df['close'].shift(1))
+        # tr    = pd.concat([high_low, high_close1, low_close1], axis=1).max(axis=1)
+        # df['atr_14'] = tr.rolling(14).mean()
+
+
+
+
+        # from scipy.signal import argrelextrema
+        # # convert to numpy for extrema
+        # highs = df['high'].values
+        # lows  = df['low'].values
+
+        # # 5‑bar lookback/lookahead
+        # swing_high_idx = argrelextrema(highs, np.greater_equal, order=5)[0]
+        # swing_low_idx  = argrelextrema(lows,  np.less_equal,    order=5)[0]
+
+        # # mark swing points
+        # df['swing_high'] = 0
+        # df.loc[df.index[swing_high_idx], 'swing_high'] = 1
+        # df['swing_low']  = 0
+        # df.loc[df.index[swing_low_idx],  'swing_low']  = 1
+
+        # # rolling count of last N swings
+        # df['recent_swings'] = df['swing_high'].rolling(50).sum() + df['swing_low'].rolling(50).sum()
+
+
+
+        # # Mark prior high/low
+        # prev_high = df['high'].rolling(20).max().shift(1)
+        # prev_low  = df['low'].rolling(20).min().shift(1)
+
+        # # Boolean for break
+        # df['break_up']   = (df['close'] > prev_high).astype(int)
+        # df['break_down'] = (df['close'] < prev_low).astype(int)
+
+
+
+        # # Volume spikes
+        # df['vol_spike'] = (df['volume'] > df['volume'].rolling(20).mean() * 2).astype(int)
+
+
+        # # Trend regime: slope of 20‑period SMA
+        # df['slope_20'] = np.arctan((df['sma20'] - df['sma20'].shift(1)))  # angle
+
+        # # Consolidation vs trending: ratio of range to ATR
+        # df['range_to_atr'] = df['high'] - df['low'] / df['atr_14']
+
+
+
+
+
+
         
         # df = df.drop(columns=['open','high','low','close','volume']) #Optionally drop these columns
         df = df.drop(columns=['open','high','low']) #Optionally drop these columns
@@ -549,7 +585,7 @@ class LSTMEventTechnicalStrategy(Strategy):
 
         return study.best_params
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+    def generate_signals(self, data: pd.DataFrame, fit: bool = True,) -> pd.DataFrame:
         df = data.copy()       
 
         # 1) Compute features + target (next-bar return)
@@ -592,7 +628,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         y_test = y_test.astype(np.float32)
 
         n_feats = X_train.shape[2]
-        print(n_feats)
+        print("Number of features:", n_feats)
         # n_feats = 45
 
         if self.with_hyperparam_fit:
@@ -680,8 +716,11 @@ class LSTMEventTechnicalStrategy(Strategy):
             max_samples=self.bootstrap,      # each bag sees max_samples% bootstrap
             random_state=self.random_state
         )
-        self.final_model = self.ensemble
-        self.final_model.fit(X_train, y_train)
+        if fit:
+            self.final_model = self.ensemble
+            self.final_model.fit(X_train, y_train)
+        else:
+            pass
         
         y_pred = self.final_model.predict(X_test)
         y_prob = self.final_model.predict_proba(X_test)[:, 1]
