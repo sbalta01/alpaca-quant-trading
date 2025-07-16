@@ -49,7 +49,8 @@ def run_live_strategy(
     lookback_minutes: int = 30, #data retrieval
     interval_seconds: int = 60, #update time,
     cash_per_trade: float = 1000,
-    feed: str = "iex"
+    feed: str = "iex",
+    market = "NYSE",
 ):
     """
     Poll market every `interval_seconds`:
@@ -169,7 +170,6 @@ def run_live_strategy(
                 feed = feed
             )
             print('USING ALPACA DATA')
-            market = 'NYSE'
         except:
             from src.data.data_loader import fetch_yahoo_data as fetch_data
             timeframe = timeframe_yahoo
@@ -181,8 +181,6 @@ def run_live_strategy(
                 timeframe=timeframe,
                 feed = feed
             )
-            market = 'NYSE'
-            # market = 'XECB'
             print('USING YAHOO DATA')
 
         market_hols = holidays.financial_holidays(market)
@@ -199,9 +197,6 @@ def run_live_strategy(
             horizon = strategy.horizon
         except:
             horizon = 0
-
-        with open(md_report_file_path, "a", encoding="utf-8") as md_file:
-            md_file.write(f"Live Trading results in market: {market}\n\n")
         
         if strategy.multi_symbol:
             # df = strategy.generate_signals(bars.copy())

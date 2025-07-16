@@ -7,10 +7,7 @@ if __name__ == "__main__":
 
     md_report_file_path = "live_trading_report.md"
     open(md_report_file_path, "w", encoding="utf-8").close() #Clear file
-    #US stocks
-    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
-    # symbols = ["MSFT"]
-    # symbols = ["SPY"]
+    
 
     strat = LSTMEventTechnicalStrategy(
         horizon=10,        # predict horizon-day return
@@ -29,6 +26,16 @@ if __name__ == "__main__":
     )
 
     lookback_time = 5*365*24*60 #In minutes
+
+    #### US stocks
+    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    # symbols = ["MSFT"]
+    # symbols = ["SPY"]
+    market = "NYSE"
+    
+    with open(md_report_file_path, "a", encoding="utf-8") as md_file:
+        md_file.write(f"Live Trading results in market: {market}\n\n")
+
     run_live_strategy(
         strat,
         symbols=symbols,
@@ -36,11 +43,20 @@ if __name__ == "__main__":
         lookback_minutes=lookback_time, #In minutes regardless of timeframe
         interval_seconds=None, #None if intended to run only once
         cash_per_trade=10000,
-        feed='iex'
+        feed='iex',
+        market=market,
         )
     
-    #EU stocks
+    with open(md_report_file_path, "a", encoding="utf-8") as md_file:
+        md_file.write("\n")
+    
+    #### EU stocks
     symbols = ["HAG.DE","RHM.DE","IDR.MC"]
+    market = "XECB"
+    
+    with open(md_report_file_path, "a", encoding="utf-8") as md_file:
+        md_file.write(f"Live Trading results in market: {market}\n\n")
+
     run_live_strategy(
         strat,
         symbols=symbols,
@@ -48,5 +64,6 @@ if __name__ == "__main__":
         lookback_minutes=lookback_time, #In minutes regardless of timeframe
         interval_seconds=None, #None if intended to run only once
         cash_per_trade=10000,
-        feed='iex'
+        feed='iex',
+        market=market,
         )
