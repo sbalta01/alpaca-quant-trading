@@ -14,25 +14,25 @@ if __name__ == "__main__":
         threshold=0.05,   # event = next-horizon-day log-return > threshold
         train_frac = 0.7,
         cv_splits = 2, #For optuna hyperparameter fitting
-        n_models = 5,
+        n_models = 10,
         bootstrap = 0.8,
         random_state=42,
         sequences_length = 25,
         prob_positive_threshold = 0.7,
-        with_hyperparam_fit = True, #Seems useful
+        with_hyperparam_fit = False, #Seems useful
         with_feature_attn = False,  #Seems useless
         with_pos_weight = True, #Crucial
         adjust_threshold = True, #More appropriate but obv it is safer a higher flat threshold
     )
 
-    lookback_time = 5*365*24*60 #In minutes
+    lookback_time = 2*365*24*60 #In minutes
 
     #### US stocks
-    symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+    symbols = ["AAPL","AMZN","MSFT","GOOG","NVDA", "VRTX", "SMH", "TXN", "QRVO"]
     # symbols = ["MSFT"]
     # symbols = ["SPY"]
     market = "NYSE"
-    
+
     with open(md_report_file_path, "a", encoding="utf-8") as md_file:
         md_file.write(f"Live Trading results in market: {market}\n\n")
 

@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # symbols = ["SPY"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","NVDA", "VRTX"]
     # symbols = ["MSFT"]
-    symbols = ["NVDA"]
+    # symbols = ["NVDA"]
     # symbols = ["ROP"]
     # symbols = ["AAPL","MSFT"]
     # symbols = ["PFE"]
@@ -45,6 +45,11 @@ if __name__ == "__main__":
     # symbols = ["NVDA"]
     # symbols = ["NDX"]
 
+    # symbols = ["AAL", "QQQ", "SMH", "SPMO", "TXN", "RMBS", "QRVO", "HIMX"]
+    symbols = ["SMH", "TXN", "QRVO"]
+
+    # symbols = ["CRWV"] #Too new to train in LSTM
+
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].to_list()
     sp500.remove('CEG')
@@ -55,7 +60,7 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2020, 7, 1)
+    start   = datetime(2023, 1, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 6, 13)
@@ -165,10 +170,10 @@ if __name__ == "__main__":
         cv_splits = 2, #For optuna hyperparameter fitting
         n_models = 10,
         bootstrap = 0.8,
-        random_state=42,
+        random_state=43,
         sequences_length = 25,
         prob_positive_threshold = 0.7,
-        with_hyperparam_fit = True, #Seems useful
+        with_hyperparam_fit = False, #Seems useful
         with_feature_attn = False,  #Seems useless
         with_pos_weight = True, #Crucial
         adjust_threshold = True, #More appropriate but obv it is safer a higher flat threshold
@@ -196,7 +201,9 @@ if __name__ == "__main__":
         end=end,
         timeframe=timeframe,
         initial_cash_per_stock=10_000,
-        # feed = 'iex'
+        # feed = 'iex',
+        fit_and_save = False,
+        # load_path = "LSTMEventTechnical_SPY_2010-01-01-2025-07-16",
     )
 
     end_backtest = time.perf_counter()
