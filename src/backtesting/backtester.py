@@ -24,10 +24,14 @@ class BacktestEngine:
         strategy: Strategy,
         data: pd.DataFrame,
         initial_cash_per_stock: float = 10_000.0,
+        fit_and_save: bool = False,
+        load_path: str = None
     ):
         self.strategy = strategy
         self.data = data
         self.initial_cash_per_stock = initial_cash_per_stock
+        self.fit_and_save = fit_and_save
+        self.load_path = load_path
 
         # Exposed for tests/reporting
         self.position: float = 0.0  # number of shares held
@@ -58,7 +62,20 @@ class BacktestEngine:
             results = []
             for symbol, subdf in df.groupby(level="symbol"):
                 single = subdf.droplevel("symbol")
-                single = self.strategy.generate_signals(single).copy() ##Generate signals one by one
+                if self.fit_and_save:
+                    first_day = single.index[0].date()
+                    last_day = single.index[-1].date()
+                    print("Fitting and saving model")
+                    save_path = f"{self.strategy.name}_{symbol}_{first_day}-{last_day}"
+                    self.strategy.fit_and_save(single, f"models/{save_path}.pkl")
+                    if self.load_path is None:
+                        print("Loading the model we have just fit")
+                        self.load_path = save_path
+                if self.load_path is not None:
+                    self.strategy.load(f"models/{self.load_path}.pkl")
+                    single = self.strategy.generate_signals(single, fit = False).copy() ##Generate signals one by one
+                else:
+                    single = self.strategy.generate_signals(single).copy() ##Generate signals one by one
                 out = self._run_single(single)
                 # Reattach symbol level
                 out["symbol"] = symbol

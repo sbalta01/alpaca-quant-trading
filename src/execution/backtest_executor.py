@@ -20,7 +20,9 @@ def run_backtest_strategy(
     end: datetime,
     timeframe: TimeFrame,  # e.g. TimeFrame.Day. Fetch data time frame.
     initial_cash_per_stock: float = 10_000.0,
-    feed: str = 'iex'
+    feed: str = 'iex',
+    fit_and_save: bool = False,
+    load_path: str = None,
 ) -> pd.DataFrame:
     """
     Run a backtest of `strategy` on `symbols` between `start` and `end`.
@@ -122,11 +124,11 @@ def run_backtest_strategy(
     print('Strategy:', strategy.name)
 
     # 2) Initialize and run backtest
-    engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock)
+    engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock, fit_and_save = fit_and_save, load_path = load_path)
     results = engine.run()
 
 
-    engine_control = BacktestEngine(strategy=BuyAndHoldStrategy(), data=df_control, initial_cash_per_stock=initial_cash_per_stock)
+    engine_control = BacktestEngine(strategy=BuyAndHoldStrategy(), data=df_control, initial_cash_per_stock=initial_cash_per_stock, fit_and_save = False, load_path = None)
     results_control = engine_control.run()
     
     # 3) Compute performance
