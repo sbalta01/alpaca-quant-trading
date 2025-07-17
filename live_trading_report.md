@@ -4,10 +4,14 @@ Live Trading results in market: NYSE
 - [AMZN] No trade signal (Position=0, Holding=False, Quantity=0).
 - [MSFT] No trade signal (Position=0, Holding=False, Quantity=0).
 - [GOOG] No trade signal (Position=0, Holding=False, Quantity=0).
-- [ROP] No trade signal (Position=0, Holding=False, Quantity=0).
+- [NVDA] No trade signal (Position=0, Holding=False, Quantity=0).
 - [VRTX] No trade signal (Position=0, Holding=False, Quantity=0).
-Live Trading results in market: NYSE
+- [SMH] No trade signal (Position=0, Holding=False, Quantity=0).
+- [TXN] No trade signal (Position=0, Holding=False, Quantity=0).
+- [QRVO] No trade signal (Position=0, Holding=False, Quantity=0).
 
-- [HAG.DE] No trade signal (Position=0, Holding=False, Quantity=0).
-- [RHM.DE] No trade signal (Position=0, Holding=False, Quantity=0).
-- [IDR.MC] No trade signal (Position=0, Holding=False, Quantity=0).
+Live Trading results in market: XECB
+
+- [HAG.DE] MANUALLY BUY at 2025-07-16 00:00:00
+- [RHM.DE] No trade signal (Position=0, Holding=0).
+- [IDR.MC] No trade signal (Position=0, Holding=0).
