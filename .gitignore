@@ -7,3 +7,4 @@ tensorboard/
 clstm_ppo_stock.zip
 models
 trial.py
+count_lines.py
