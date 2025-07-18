@@ -12,6 +12,6 @@ Live Trading results in market: NYSE
 
 Live Trading results in market: XECB
 
-- [HAG.DE] MANUALLY BUY at 2025-07-16 00:00:00
+- [HAG.DE] Holding position. Days left = 8.
 - [RHM.DE] No trade signal (Position=0, Holding=0).
 - [IDR.MC] No trade signal (Position=0, Holding=0).
