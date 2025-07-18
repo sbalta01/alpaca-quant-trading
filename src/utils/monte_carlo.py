@@ -48,6 +48,7 @@ class monte_carlo_portfolio_risk():
 
         if isinstance(self.price_hist.index, pd.MultiIndex):
             self.price_hist = self.price_hist["close"].unstack(level="symbol")
+
         self.price_hist = self.price_hist.dropna() #Avoid missing prices
     
         self.n_steps = int(self.T / self.dt)
@@ -59,7 +60,7 @@ class monte_carlo_portfolio_risk():
             self.final_price = None
         else:
             if len(self.price_hist) < self.n_steps:
-                raise Exception("Need to increase the number of datapoints or quit backtesting")
+                raise Exception("The number of data points intended for backtesting is larger than the dataset")
             self.logrets = np.log(self.price_hist / self.price_hist.shift(1)).dropna().iloc[:-self.n_steps] #Use only up until -n_steps timesteps to compute GBM parameters
             self.start_prices = self.price_hist.iloc[-self.n_steps].values
             self.times = self.price_hist.index[-self.n_steps:]
