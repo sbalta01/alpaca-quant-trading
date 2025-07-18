@@ -136,11 +136,11 @@ def plot_monte_carlo_results(paths: np.ndarray,
     plt.figure()
     _, bins, patches = plt.hist(terminal_returns*100, bins=25, color = 'steelblue')
     
-    plt.axvline(var*100, linestyle='--', color = 'k',label=f"Day-scaled VaR ({int((1 - alpha_empirical)*100)}%) = {var/np.sqrt(n_steps-1):.2%}")
-    plt.axvline(cvar*100, linestyle='-', color = 'k', label=f"Day-scaled CVaR ({alpha_empirical:0.1%} tail) = {cvar/np.sqrt(n_steps-1):.2%}")
+    plt.axvline(var*100, linestyle='--', color = 'k',label=f"VaR ({int((1 - alpha_empirical)*100)}%) = {var:.2%}")
+    plt.axvline(cvar*100, linestyle='-', color = 'k', label=f"CVaR ({alpha_empirical:0.1%} tail) = {cvar:.2%}")
 
-    plt.axvline(var_evt*100, linestyle='--', color = 'grey',label=f"Day-scaled VaR_EVT ({int((1 - alpha_evt)*100)}%) = {var_evt/np.sqrt(n_steps-1):.2%}")
-    plt.axvline(cvar_evt*100, linestyle='-', color = 'grey', label=f"Day-scaled CVaR_EVT ({alpha_evt:0.1%} tail) = {cvar_evt/np.sqrt(n_steps-1):.2%}")
+    plt.axvline(var_evt*100, linestyle='--', color = 'grey',label=f"VaR_EVT ({int((1 - alpha_evt)*100)}%) = {var_evt:.2%}")
+    plt.axvline(cvar_evt*100, linestyle='-', color = 'grey', label=f"CVaR_EVT ({alpha_evt:0.1%} tail) = {cvar_evt:.2%}")
     if final_price is not None:
         plt.axvline((final_price/paths[0,0] - 1)*100, color = 'navy',label = "Historical return")
 
@@ -228,7 +228,6 @@ def monte_carlo_portfolio_risk(
             Z = r.randn(n_sims, n_assets)
             # impose correlation
             Zc = Z @ L.T
-            # Zc = Z
             # exponent increment per asset
             inc = drift + vol * Zc
             # update
@@ -277,8 +276,10 @@ def monte_carlo_portfolio_risk(
         final_price=final_price,
     )
 
-    print('Best position', best_position)
-    print(f'VaR {best_empirical["VaR"]:0.2%}')
+    if trials > 1:
+        print('Best position', best_position)
+    print(f'VaR: {best_empirical["VaR"]:0.2%}')
+    print(f'CVaR: {best_empirical["CVaR"]:0.2%}')
 
     return {
         "paths":   best_port_paths,

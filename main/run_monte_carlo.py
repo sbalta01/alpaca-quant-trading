@@ -4,8 +4,8 @@ import numpy as np
 from src.data.data_loader import fetch_nasdaq_100_symbols
 from src.utils.monte_carlo import monte_carlo_portfolio_risk, plot_monte_carlo_results
 
-symbols = ["SPY"]
-# symbols = ["AAPL","AMZN","MSFT","GOOG","ROP", "VRTX"]
+# symbols = ["SPY"]
+# symbols = ["AAPL","AMZN","MSFT","GOOG", "VRTX"]
 # symbols = ["MSFT"]
 # symbols = ["ROP"]
 # symbols = ["AAPL","MSFT"]
@@ -17,9 +17,9 @@ symbols = ["SPY"]
 # symbols = ["LMT"]
 # symbols = ["WOLF"]
 
-# symbols = fetch_nasdaq_100_symbols()
+symbols = fetch_nasdaq_100_symbols()
 
-start   = datetime(2023, 1, 1)
+start   = datetime(2023, 7, 1)
 # start   = datetime(2025, 1, 5)
 end     = datetime.now()
 # end     = datetime(2025, 1, 1)
@@ -69,12 +69,13 @@ except:
 
 results = monte_carlo_portfolio_risk( #10-day horizon over >250 days of data is good
     price_hist   = df,                    # multiindex or wide
-    T            = 11/252, #In years. n_steps = T - 1
+    # T            = 11/252, #In years. n_steps = T - 1
+    T            = 1, #In years. n_steps = T - 1
     dt           = 1/252, #1/252 = 1 day
     n_sims       = 10000,
     alpha_empirical= 0.05,
     alpha_evt    = 0.01,
-    trials       = 100, #Number of models to run
+    trials       = 50, #Number of models to run to optimize position sizing
     random_state = 43,
     backtest = False, #Backtesting uses all data up until -T to compute GBM parameters and starts predicting from -T. It is equivalent to predicting from -T.
 )

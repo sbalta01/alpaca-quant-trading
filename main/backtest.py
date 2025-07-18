@@ -5,15 +5,16 @@ from alpaca.data.timeframe import TimeFrame
 from matplotlib import pyplot as plt
 import pandas as pd
 
-from src.data.data_loader import fetch_nasdaq_100_symbols
+from src.data.data_loader import fetch_nasdaq_100_symbols, fetch_sp500_symbols
 from src.strategies.adaboost_ML import AdaBoostStrategy
 from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrategy
 from src.strategies.lstm_event_arima_garch_ML import LSTMEventStrategy
 from src.strategies.lstm_event_technical_ML import LSTMEventTechnicalStrategy
 from src.strategies.lstm_regression_ML import LSTMRegressionStrategy
+from src.strategies.macd import MACDStrategy
 from src.strategies.momentum_ranking_adaboost_ML import MomentumRankingAdaBoostStrategy
 from src.execution.backtest_executor import run_backtest_strategy
-from src.backtesting.visualizer import plot_returns, plot_signals
+from src.backtesting.visualizer import plot_candles_with_macd, plot_returns, plot_signals
 
 import time
 
@@ -27,7 +28,8 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["AAPL","AMZN","MSFT","GOOG","NVDA", "VRTX"]
+    # symbols = ["NDX"]
+    symbols = ["AAPL","AMZN","MSFT","GOOG","VRTX"]
     # symbols = ["MSFT"]
     # symbols = ["NVDA"]
     # symbols = ["ROP"]
@@ -46,7 +48,7 @@ if __name__ == "__main__":
     # symbols = ["NDX"]
 
     # symbols = ["AAL", "QQQ", "SMH", "SPMO", "TXN", "RMBS", "QRVO", "HIMX"]
-    symbols = ["SMH", "TXN", "QRVO"]
+    # symbols = ["SMH", "TXN", "QRVO"]
 
     # symbols = ["CRWV"] #Too new to train in LSTM
 
@@ -60,7 +62,7 @@ if __name__ == "__main__":
 
     # symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2023, 1, 1)
+    start   = datetime(2020, 9, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 6, 13)
@@ -163,22 +165,6 @@ if __name__ == "__main__":
     #     adjust_threshold = False,
     # )
 
-    strat = LSTMEventTechnicalStrategy(
-        horizon=10,        # predict horizon-day return
-        threshold=0.05,   # event = next-horizon-day log-return > threshold
-        train_frac = 0.7,
-        cv_splits = 2, #For optuna hyperparameter fitting
-        n_models = 10,
-        bootstrap = 0.8,
-        random_state=43,
-        sequences_length = 25,
-        prob_positive_threshold = 0.7,
-        with_hyperparam_fit = False, #Seems useful
-        with_feature_attn = False,  #Seems useless
-        with_pos_weight = True, #Crucial
-        adjust_threshold = True, #More appropriate but obv it is safer a higher flat threshold
-    )
-
     # strat = LSTMRegressionStrategy(
     #     horizon=20,        # predict next horizon-day return
     #     threshold=0.05,   # allow only next-horizon-day log-return > threshold signals
@@ -191,6 +177,30 @@ if __name__ == "__main__":
     #     with_hyperparam_fit = True,
     #     with_feature_attn = False,
     # )
+
+    # strat = LSTMEventTechnicalStrategy(
+    #     horizon=10,        # predict horizon-day return
+    #     threshold=0.05,   # event = next-horizon-day log-return > threshold
+    #     train_frac = 0.5,
+    #     cv_splits = 2, #For optuna hyperparameter fitting
+    #     n_models = 10,
+    #     bootstrap = 0.8,
+    #     random_state=43,
+    #     sequences_length = 25,
+    #     prob_positive_threshold = 0.7,
+    #     with_hyperparam_fit = False, #Seems useful
+    #     with_feature_attn = False,  #Seems useless
+    #     with_pos_weight = True, #Crucial
+    #     adjust_threshold = True, #More appropriate but obv it is safer a higher flat threshold
+    # )
+
+    strat = MACDStrategy(
+        fast = 12,
+        slow = 26,
+        signal = 9,
+        hist_mom = 3,
+        zero_filter = True,
+    )
 
     start_backtest = time.perf_counter()
 
@@ -211,8 +221,9 @@ if __name__ == "__main__":
     formatted = str(timedelta(seconds=elapsed_seconds))
     print(f"Elapsed time: {formatted}")
 
-    # Plot the equity curve
-    plot_returns(results, results_control, title=f"{strat.name} Equity Curve")
+    # # Plot the equity curve
+    # plot_returns(results, results_control, title=f"{strat.name} Equity Curve")
+
     # Price with buy/sell markers for each symbol
     plot_signals(
         results,

@@ -22,3 +22,5 @@ tqdm
 rich
 optuna
 holidays
+finnhub-python
+mplfinance
