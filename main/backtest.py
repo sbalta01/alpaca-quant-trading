@@ -28,8 +28,8 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    # symbols = ["NDX"]
-    symbols = ["AAPL","AMZN","MSFT","GOOG","VRTX"]
+    symbols = ["NDX"]
+    # symbols = ["AAPL","AMZN","MSFT","GOOG","VRTX"]
     # symbols = ["MSFT"]
     # symbols = ["NVDA"]
     # symbols = ["ROP"]
@@ -60,9 +60,9 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    # symbols = fetch_nasdaq_100_symbols()
+    symbols = fetch_nasdaq_100_symbols()
 
-    start   = datetime(2020, 9, 1)
+    start   = datetime(2015, 9, 1)
     # start   = datetime(2025, 1, 5)
     end     = datetime.now()
     # end     = datetime(2025, 6, 13)
