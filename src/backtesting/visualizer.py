@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import pandas as pd
 
+from matplotlib import animation
+import mplfinance as mpf
+
 def plot_returns(results: pd.DataFrame, results_control: pd.DataFrame, title: str = "returns Curve") -> None:
     """
     Plot the evolution of account returns over time.
@@ -98,3 +101,73 @@ def plot_signals(
     fig.autofmt_xdate()
     plt.tight_layout()
     # plt.show()
+
+def plot_candles_with_macd(df, animate = False):
+    """
+    Given a MultiIndex DataFrame 'df' with levels ['symbol','timestamp']
+    and columns ['open','high','low','close','volume'], create for each symbol:
+      - Candlestick chart
+      - Volume subplot
+      - MACD subplot
+    """
+
+    symbols = df.index.get_level_values('symbol').unique()
+    for sym in symbols:
+        # Slice out symbol data and reframe index
+        df_sym = df.xs(sym, level='symbol')
+
+        # Calculate MACD lines
+        #  - 12‐period EMA, 26‐period EMA, their difference is MACD
+        #  - 9‐period EMA of MACD is the Signal line
+        ema_short = df_sym['close'].ewm(span=12, adjust=False).mean()
+        ema_long  = df_sym['close'].ewm(span=26, adjust=False).mean()
+        macd_line = ema_short - ema_long
+        signal    = macd_line.ewm(span=9, adjust=False).mean()
+        hist      = macd_line - signal
+
+
+        apds = [
+        mpf.make_addplot(hist,type='bar',width=0.7,panel=1,
+                         color='dimgray',alpha=1,secondary_y=False),
+        mpf.make_addplot(macd_line,panel=1,color='fuchsia',secondary_y=True),
+        mpf.make_addplot(signal,panel=1,color='b',secondary_y=True, linestyle='--'),
+       ]
+        s = mpf.make_mpf_style(base_mpf_style='yahoo',rc={'figure.facecolor':'white'})
+
+        fig, axes = mpf.plot(df_sym,type='candle',addplot=apds,figscale=1.5,figratio=(7,5),title=f"{sym} — Candles + MACD",
+                            style=s,volume=True,volume_panel=2,panel_ratios=(6,3,2),returnfig=True)
+
+        ax_main = axes[0]
+        ax_emav = ax_main
+        ax_hisg = axes[2]
+        ax_macd = axes[3]
+        ax_sign = ax_macd
+        ax_volu = axes[4]
+
+        if animate:
+            def animate(ival):
+                if (20+ival) > len(df):
+                    ani.event_source.interval *= 3
+                    if ani.event_source.interval > 12000:
+                        exit()
+                    return
+                data = df_sym.iloc[0:(30+ival)]
+                exp12     = data['close'].ewm(span=12, adjust=False).mean()
+                exp26     = data['close'].ewm(span=26, adjust=False).mean()
+                macd      = exp12 - exp26
+                signal    = macd.ewm(span=9, adjust=False).mean()
+                histogram = macd - signal
+                apds = [mpf.make_addplot(exp12,color='lime',ax=ax_emav),
+                        mpf.make_addplot(exp26,color='c',ax=ax_emav),
+                        mpf.make_addplot(histogram,type='bar',width=0.7,
+                                        color='dimgray',alpha=1,ax=ax_hisg),
+                        mpf.make_addplot(macd,color='fuchsia',ax=ax_macd),
+                        mpf.make_addplot(signal,color='b',ax=ax_sign, linestyle = '--'),
+                    ]
+
+                for ax in axes:
+                    ax.clear()
+                mpf.plot(data,type='candle',addplot=apds,ax=ax_main,volume=ax_volu)
+
+            ani = animation.FuncAnimation(fig,animate,interval=100)
+        # plt.show()
