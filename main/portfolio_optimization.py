@@ -5,7 +5,7 @@ from src.data.data_loader import fetch_nasdaq_100_symbols
 from src.utils.monte_carlo import monte_carlo_portfolio_risk
 
 # symbols = ["SPY"]
-# symbols = ["AAPL","AMZN","MSFT","GOOG", "VRTX"]
+symbols = ["AAPL","AMZN","MSFT","GOOG"]
 # symbols = ["MSFT"]
 # symbols = ["ROP"]
 # symbols = ["AAPL","MSFT"]
@@ -17,7 +17,7 @@ from src.utils.monte_carlo import monte_carlo_portfolio_risk
 # symbols = ["LMT"]
 # symbols = ["WOLF"]
 
-symbols = fetch_nasdaq_100_symbols()
+# symbols = fetch_nasdaq_100_symbols()
 
 end     = datetime.now()
 # end     = datetime(2023, 1, 1)
@@ -83,7 +83,7 @@ monte_carlo_simulator = monte_carlo_portfolio_risk( #10-day horizon over >250 da
         volat_penalty = 1.0,
         cvar_penalty = 1.0,
         random_state = 43,
-        predict = False, #Backtesting uses all data up until -T to compute GBM parameters and starts predicting from -T. It is equivalent to predicting from -T.
+        predict = True, #Backtesting uses all data up until -T to compute GBM parameters and starts predicting from -T. It is equivalent to predicting from -T.
         optimize_position_sizing = True,
     )
 
