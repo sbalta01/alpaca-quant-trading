@@ -1,0 +1,78 @@
+name: Rebalance Portfolio Deploy
+run-name: ${{ github.actor }} is rebalancing the portfolio. 
+
+on:
+  schedule: ##Opening times US market: 13:30-20:00 UTC
+    - cron:  '30 13 9 * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+  workflow_dispatch:        # Allows manual trigger
+
+# Allow pushing back to the repo
+permissions:
+  contents: write
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: ${{ secrets.API_KEY }}
+      API_SECRET: ${{ secrets.API_SECRET }}
+      PAPER: True
+
+    steps:
+      - name: Checkout repo (with write access)
+        uses: actions/checkout@v3
+        with:
+          # so the checkout action configures Git with the GITHUB_TOKEN
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Deploy portfolio rebalance
+        env:
+            PYTHONPATH: ${{ github.workspace }}
+        
+        run: python main\rebalance_portfolio.py
+
+      - name: Commit & push changes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add live_portfolio_rebalance.md
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto-update live_portfolio_rebalance"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+
+      - name: Send report as email body
+        uses: dawidd6/action-send-mail@v6
+        with:
+          # either via connection_url or broken-out parameters:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port:    ${{ secrets.SMTP_PORT }}
+          username:       ${{ secrets.SMTP_USERNAME }}
+          password:       ${{ secrets.SMTP_PASSWORD }}
+
+          subject:        "Daily Live Trading Report"
+          from:           ${{ secrets.SMTP_USERNAME }}
+          to:             ${{ secrets.SMTP_USERNAME }}
+
+          # key bit: load the entire JSON file as the e‑mail body
+          content_type:   text/plain
+          body:           file://live_portfolio_rebalance.md
