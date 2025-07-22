@@ -45,7 +45,7 @@ jobs:
         env:
             PYTHONPATH: ${{ github.workspace }}
         
-        run: python main\rebalance_portfolio.py
+        run: python main/rebalance_portfolio.py
 
       - name: Commit & push changes
         run: |
