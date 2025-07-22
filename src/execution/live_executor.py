@@ -74,9 +74,9 @@ def run_live_strategy(
         holding = any(p.symbol == symbol for p in open_pos) #Whether I own 'symbol'
         # elapsed_open_days = np.inf #Initialize how long have I had this position open to infinity (to trade no matter what)
         if holding:  #If I hold symbol, get my open position
-            position = trading_client.get_open_position(symbol)
-            qty = position.qty
-            qty_available = position.qty_available
+            current_position = trading_client.get_open_position(symbol)
+            qty = current_position.qty
+            qty_available = current_position.qty_available
 
             # orders = trading_client.get_orders(filter=GetOrdersRequest(
             #                                                             symbols=[symbol],
