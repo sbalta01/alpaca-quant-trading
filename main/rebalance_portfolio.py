@@ -119,10 +119,13 @@ def main():
     md_report_file_path = "live_portfolio_rebalance.md"
     open(md_report_file_path, "w", encoding="utf-8").close() #Clear report
 
+    # Available for tuning
     now_utc = datetime.now(tz=timezone.utc)
-    start = now_utc - timedelta(days= 2* 365)
+    start = now_utc - timedelta(days= 2* 365) #Dataset for fitting the GBM parameters
     timeframe = "1d"
-    update_portfolio_horizon = 25
+    update_portfolio_horizon = 30
+    total_investment = 50_000
+
     market_hols = holidays.financial_holidays("NYSE")
     today = now_utc.date()
     if today.weekday() >= 5:
@@ -157,7 +160,6 @@ def main():
             md_file.write(stats_report)
             md_file.write("\n")
 
-    total_investment = 50_000
     rebalance_portfolio(targets, current, total_investment, md_report_file_path=md_report_file_path)
 
     with open(md_report_file_path, "a", encoding="utf-8") as md_file: # Update report
