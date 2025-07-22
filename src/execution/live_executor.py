@@ -106,7 +106,8 @@ def run_live_strategy(
             qty = 0
 
         # Act on signal
-        if position == 1 and not holding:
+        # if position == 1 and not holding: #Do NOT buy if I already own. Conflicts with rebalancing portfolio
+        if position == 1: #BUY even if I already own. Even if I own it can enter the horizon again, which may increase losses.
             report = f"[{symbol}] BUY at {latest.name} price={latest.close:.2f}"
             print(report)
             order = MarketOrderRequest(
