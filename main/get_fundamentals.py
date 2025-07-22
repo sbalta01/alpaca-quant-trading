@@ -39,13 +39,6 @@ peTTM = series['peTTM'][:-10]
 f_dates = pd.to_datetime([f['period'] for f in peTTM])
 f_values = pd.Series([f['v'] for f in peTTM])
 
-# fig, (ax1, ax2) = plt.subplots(2,1)
-# for symbol, subdf in df.groupby(level="symbol"):
-#     subdf = subdf.droplevel("symbol")
-#     ax1.plot(subdf.index, subdf["close"])
-#     ax2.scatter(f_dates, f_values)
-#     plt.show()
-
 fig, ax1 = plt.subplots(figsize=(10,5))
 for symbol, subdf in df.groupby(level="symbol"):
     subdf = subdf.droplevel("symbol")
