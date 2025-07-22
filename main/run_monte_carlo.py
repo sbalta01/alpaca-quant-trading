@@ -93,8 +93,8 @@ best_port_paths, optimized_portfolio, empirical, evt = monte_carlo_simulator.sim
 
 print("Portfolio:")
 print(optimized_portfolio.sort_values(by="position", axis = 0, ascending=False).loc[optimized_portfolio["position"]>1e-3])
-print(f"\nPortfolio VaR (95%): {empirical[0]:.2%}")
-print(f"Portfolio CVaR (5% tail): {empirical[1]:.2%}")
+print(f"Portfolio VaR ({1-monte_carlo_simulator.alpha_empirical:0.0%}): {empirical[0]:.2%}")
+print(f"Portfolio CVaR ({monte_carlo_simulator.alpha_empirical:0.0%} tail): {empirical[1]:.2%}")
 
 
 monte_carlo_simulator.plot_monte_carlo_results(best_port_paths,
