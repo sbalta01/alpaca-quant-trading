@@ -903,7 +903,13 @@ class LSTMEventTechnicalStrategy(Strategy):
         
         y_prob = self.final_model.predict_proba(X)[:, 1]
 
-        # 5) Final predictions on test history
+        # Final metrics on history
+        prec_train = precision_score(y, self.final_model.predict(X))
+        print(f"Precision (Train): {prec_train:.3f}")
+
+        acc_train = accuracy_score(y, self.final_model.predict(X))
+        print(f"Accuracy (Train): {acc_train:.3f}")
+
         auc_train  = roc_auc_score(y, y_prob)
         print(f"ROC AUC (Train): {auc_train:.3f}")
 
