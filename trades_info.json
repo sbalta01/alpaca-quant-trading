@@ -8,10 +8,20 @@
     "days_left_HAG.DE": 5,
     "days_left_RHM.DE": 0,
     "days_left_IDR.MC": 0,
-    "days_left_ECR.MC": 0,
     "days_left_NVDA": 0,
     "days_left_SMH": 0,
     "days_left_TXN": 0,
     "days_left_QRVO": 0,
-    "position_HAG.DE": 1
+    "position_HAG.DE": 1,
+    "position_AAPL": 0,
+    "position_AMZN": 0,
+    "position_MSFT": 0,
+    "position_GOOG": 0,
+    "position_NVDA": 0,
+    "position_VRTX": 0,
+    "position_SMH": 0,
+    "position_TXN": 0,
+    "position_QRVO": 0,
+    "position_RHM.DE": 0,
+    "position_IDR.MC": 0
 }
