@@ -69,45 +69,17 @@ def run_live_strategy(
     feed : str
     """
 
-    def trade(position, symbol, days_left):
+    def trade(position, symbol, days_left, prev_position):
         open_pos = trading_client.get_all_positions()
-        holding = any(p.symbol == symbol for p in open_pos) #Whether I own 'symbol'
-        # elapsed_open_days = np.inf #Initialize how long have I had this position open to infinity (to trade no matter what)
-        if holding:  #If I hold symbol, get my open position
+
+        if any(p.symbol == symbol for p in open_pos):  #If I hold symbol, get my open position
             current_position = trading_client.get_open_position(symbol)
             qty = current_position.qty
-            qty_available = current_position.qty_available
-
-            # orders = trading_client.get_orders(filter=GetOrdersRequest(
-            #                                                             symbols=[symbol],
-            #                                                             side=OrderSide.BUY,
-            #                                                             status=QueryOrderStatus.CLOSED,
-            #                                                             limit=50,
-            #                                                         ))
-            # if orders: #if I hold, check when was the last buy
-            #     last = orders[0]
-            #     print(f"Last order for {last.symbol}:")
-            #     print(f"  · Side       : {last.side}")
-            #     print(f"  · Status     : {last.status}")
-            #     print(f"  · Filled     : {last.filled_at}")   # may be None if not filled
-            #     if last.filled_at is not None: #If the last buy was filled, save its date
-            #         last_trade_date = last.filled_at.date()
-            #         today = datetime.now().date()
-
-            #         # 3) Count business days (Mon–Fri)
-            #         trading_days = pd.bdate_range(start=last_trade_date, end=today)
-
-            #         # 4) Elapsed open‑market days **excluding** the day of last_buy itself
-            #         elapsed_open_days = len(trading_days) - 1
-
-            # else:
-            #     print(f"No orders found for {symbol}.")
         else:
             qty = 0
 
         # Act on signal
-        # if position == 1 and not holding: #Do NOT buy if I already own. Conflicts with rebalancing portfolio
-        if position == 1: #BUY even if I already own. Even if I own it can enter the horizon again, which may increase losses.
+        if position == 1 and prev_position == 0: #Only buy if I do not own
             report = f"[{symbol}] BUY at {latest.name} price={latest.close:.2f}"
             print(report)
             order = MarketOrderRequest(
@@ -120,22 +92,25 @@ def run_live_strategy(
             trading_client.submit_order(order)
             tracker.record_trade(latest.name, symbol, 1, "buy", latest.close)
             days_left = horizon - 1
+            new_position = position
 
-        elif position == 0 and holding:
+        elif position == 0 and prev_position == 1:
             report = f"[{symbol}] SELL at {latest.name} price={latest.close:.2f}"
             print(report)
             order = MarketOrderRequest(
                 symbol=symbol,
-                qty=qty_available, #Sell all shares owned
+                notional = cash_per_trade,
                 side=OrderSide.SELL,
                 time_in_force=TimeInForce.DAY
             )
             trading_client.submit_order(order)
             tracker.record_trade(latest.name, symbol, 1, "sell", latest.close)
+            new_position = position
         else:
-            report = f"[{symbol}] No trade signal (Position={position}, Holding={holding}, Quantity={qty})."
+            new_position = prev_position
+            report = f"[{symbol}] No trade signal (Position={position}, Holding={new_position}, Quantity={qty})."
             print(report)
-        return days_left, report
+        return days_left, new_position, report
     
     running = True
     while running:
@@ -210,6 +185,12 @@ def run_live_strategy(
         else:
             for symbol in symbols:
                 days_left_key = f"days_left_{symbol}"
+
+                try:
+                    prev_position = trades_info[f"position_{symbol}"] #Whether I own this stock according to this strategy
+                except:
+                    prev_position = 0
+                
                 try:
                     days_left = trades_info[days_left_key] #Get how many days left for next trade
                 except:
@@ -227,29 +208,29 @@ def run_live_strategy(
                         days_left += 1
                     report = f"[{symbol}] Holding position. Days left = {days_left}."
                     print(report)
+                    new_position = prev_position
                 else:
                     if market == 'NYSE':
-                        days_left, report = trade(position, symbol, days_left)
+                        days_left, new_position, report = trade(position, symbol, days_left, prev_position)
                     elif market == 'XECB':
-                        try:
-                            holding = trades_info[f"position_{symbol}"]
-                        except:
-                            holding = 0
-                        if position == 1 and holding == 0:
+                        if position == 1 and prev_position == 0:
                             report = f"[{symbol}] MANUALLY BUY at {latest.name}"
                             print(report)
                             days_left = horizon - 1
-                            trades_info[f"position_{symbol}"] = int(position)
-                        elif position == 0 and holding == 1:
+                            new_position = position
+                        elif position == 0 and prev_position == 1:
                             report = f"[{symbol}] MANUALLY SELL at {latest.name}"
                             print(report)
-                            trades_info[f"position_{symbol}"] = int(position)
+                            new_position = position
                         else:
-                            report = f"[{symbol}] No trade signal (Position={position}, Holding={holding})."
+                            new_position = prev_position
+                            report = f"[{symbol}] No trade signal (Position={position}, Holding={new_position})."
                             print(report)
 
                 # Save the updated JSON back to the file
                 trades_info[days_left_key] = days_left
+                trades_info[f"position_{symbol}"] = new_position
+
                 with open(json_file_path, 'w') as file:
                     json.dump(trades_info, file, indent=4)
 
