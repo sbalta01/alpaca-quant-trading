@@ -102,7 +102,7 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
                 side=side,
                 time_in_force=TimeInForce.DAY,
             )
-            # trading_client.submit_order(order)
+            trading_client.submit_order(order)
             report = f"Submitted {side} order for {qty_to_order}$ of {symbol}. New proportion of portfolio: {target_proportion:0.2%}\n"
             print(report)
         except Exception as e:
