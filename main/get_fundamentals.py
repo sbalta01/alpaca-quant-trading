@@ -1,9 +1,11 @@
 from datetime import datetime
-from finnhub import Client
 import os
-from dotenv import load_dotenv
 from matplotlib import pyplot as plt
 import pandas as pd
+
+from finnhub import Client
+
+from dotenv import load_dotenv
 load_dotenv()
 
 finnhub_client = Client(api_key=os.getenv("FINNHUB_API_KEY"))
