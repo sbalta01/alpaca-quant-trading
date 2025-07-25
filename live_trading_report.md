@@ -12,6 +12,6 @@ Live Trading results in market: NYSE
 
 Live Trading results in market: XECB
 
-- [HAG.DE] Holding position. Days left = 4.
+- [HAG.DE] Holding position. Days left = 3.
 - [RHM.DE] No trade signal (Position=0, Holding=0).
 - [IDR.MC] No trade signal (Position=0, Holding=0).
