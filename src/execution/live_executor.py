@@ -228,8 +228,8 @@ def run_live_strategy(
                             print(report)
 
                 # Save the updated JSON back to the file
-                trades_info[days_left_key] = days_left
-                trades_info[f"position_{symbol}"] = new_position
+                trades_info[days_left_key] = int(days_left) #Ensure Json serializable
+                trades_info[f"position_{symbol}"] = int(new_position) #Ensure Json serializable
 
                 with open(json_file_path, 'w') as file:
                     json.dump(trades_info, file, indent=4)
