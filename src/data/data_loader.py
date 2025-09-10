@@ -7,6 +7,9 @@ from typing import List, Union
 import yfinance as yf
 from pandas_datareader import data as pdr
 
+import requests
+from io import StringIO
+
 
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
@@ -25,15 +28,34 @@ def fetch_sp500_symbols():
     df[['Symbol']].to_csv('sp500.csv', index=False)
     print("sp500.csv created with", len(df), "symbols.")
 
+# def fetch_nasdaq_100_symbols():
+#     url = "https://en.wikipedia.org/wiki/NASDAQ-100"
+#     tables = pd.read_html(url)
+    
+#     # First table on the page is the component list
+#     df = tables[4]  # As of now, table 4 contains the companies
+#     symbols = df['Ticker'].tolist()
+    
+#     # Some tickers have "." instead of "-", fix for Yahoo Finance
+#     symbols = [s.replace('.', '-') for s in symbols]
+#     return symbols
+
+
 def fetch_nasdaq_100_symbols():
     url = "https://en.wikipedia.org/wiki/NASDAQ-100"
-    tables = pd.read_html(url)
+    headers = {"User-Agent": "Mozilla/5.0"}  # Pretend to be a browser
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()  # Raise error if request failed
     
-    # First table on the page is the component list
-    df = tables[4]  # As of now, table 4 contains the companies
+    # Wrap HTML string in StringIO
+    html = StringIO(response.text)
+    tables = pd.read_html(html)
+    
+    # Find the table that contains "Ticker" (since table index can change)
+    df = next(tbl for tbl in tables if "Ticker" in tbl.columns)
+    
     symbols = df['Ticker'].tolist()
-    
-    # Some tickers have "." instead of "-", fix for Yahoo Finance
+    # Replace '.' with '-' for Yahoo Finance compatibility
     symbols = [s.replace('.', '-') for s in symbols]
     return symbols
 
