@@ -4,7 +4,7 @@ Live Trading results in market: NYSE
 - [AMZN] No trade signal (Position=0, Holding=0, Quantity=0).
 - [MSFT] No trade signal (Position=0, Holding=0, Quantity=0).
 - [GOOG] No trade signal (Position=0, Holding=0, Quantity=0).
-- [NVDA] No trade signal (Position=0, Holding=0, Quantity=10.491694322).
+- [NVDA] No trade signal (Position=0, Holding=0, Quantity=1.602133479).
 - [VRTX] No trade signal (Position=0, Holding=0, Quantity=0).
 - [SMH] No trade signal (Position=0, Holding=0, Quantity=0).
 - [TXN] No trade signal (Position=0, Holding=0, Quantity=0).
