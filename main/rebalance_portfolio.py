@@ -90,20 +90,30 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
         target_notional = total_portfolio_notional*target_proportion #Every time I rebalance, I always keep whatever the total equity is, and not realize any differences
         delta = target_notional - current_notional
         if abs(delta) < 1: #No trades below 1$ are allowed in Alpaca
-            report = f"No order submitted for {symbol}.\n"
-            print(report)
+            report = f"Order below 1$ -> No order submitted for {symbol}.\n"
+            # print(report)
             continue
         side = OrderSide.BUY if delta > 0 else OrderSide.SELL
         qty_to_order = round(abs(delta),2)
         try:
-            order = MarketOrderRequest(
-                symbol=symbol,
-                notional=qty_to_order,
-                side=side,
-                time_in_force=TimeInForce.DAY,
-            )
-            trading_client.submit_order(order)
-            report = f"Submitted {side} order for {qty_to_order}$ of {symbol}. New proportion of portfolio: {target_proportion:0.2%}\n"
+            if abs(target_notional) < 1: #If the new target is almost 0 then sell everything
+                qty_to_order = trading_client.get_open_position(symbol).qty_available
+                order = MarketOrderRequest(
+                    symbol=symbol,
+                    qty=qty_to_order,
+                    side=side,
+                    time_in_force=TimeInForce.DAY,
+                )
+                report = f"Submitted {side} order for ALL shares of {symbol}. New proportion of portfolio: {target_proportion:0.2%}\n"
+            else:
+                order = MarketOrderRequest(
+                    symbol=symbol,
+                    notional=qty_to_order,
+                    side=side,
+                    time_in_force=TimeInForce.DAY,
+                )
+                report = f"Submitted {side} order for {qty_to_order}$ of {symbol}. New proportion of portfolio: {target_proportion:0.2%}\n"
+            # trading_client.submit_order(order)
             print(report)
         except Exception as e:
             report = f"Error submitting order for {symbol}: {e}\n"
@@ -113,7 +123,7 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
             md_file.write(report)
 
     realized_returns = total_portfolio_notional/initial_investment - 1
-    returns_report = f"Total returns from the beginning: {realized_returns:0.2%}\n"
+    returns_report = f"Total returns from 2025-07-22: {realized_returns:0.2%}\n"
     print(returns_report)
     with open(md_report_file_path, "a", encoding="utf-8") as md_file:
         md_file.write(returns_report)
@@ -127,7 +137,7 @@ def main():
     start = now_utc - timedelta(days= 2* 365) #Dataset for fitting the GBM parameters
     timeframe = "1d"
     update_portfolio_horizon = 30
-    initial_investment = 50_000 #50_000 for nas100 tickers at 2025-07-22
+    initial_investment = 61_000 #61_000 for nas100 tickers at 2025-07-22
 
     market_hols = holidays.financial_holidays("NYSE")
     today = now_utc.date()
