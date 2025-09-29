@@ -11,19 +11,35 @@ load_dotenv()
 finnhub_client = Client(api_key=os.getenv("FINNHUB_API_KEY"))
 
 # Fetch current + historical fundamentals:
-symbols = ["AAPL"]
+symbols = ["PCG"]
 financials = finnhub_client.company_basic_financials(symbols, 'all')
-
-# Current metrics:
-current = financials['metric']
-# print(current.keys())
-print("P/E today:", current["peTTM"])
 
 # Historical snapshots (quarterly):
 series = financials['series']['quarterly']
 # print(series.keys())
 for pe_point in series['peTTM'][:]:
     print(pe_point['period'], "PE =", pe_point['v'])
+
+
+# Current metrics:
+current = financials['metric']
+
+pe_ratio = current['peTTM']
+ebitda_per_share = current['ebitdPerShareTTM']
+eps = current['epsTTM']
+forward_pe = current['forwardPE']
+earnings_growth = current['epsGrowthTTMYoy']# PEG ratio = PE / growth rate (in %)
+peg_ratio = pe_ratio / earnings_growth if earnings_growth else None
+
+
+## NEED CHECKING UNITS AND FORMULAS
+print('Data today:')
+print("PE Ratio:", pe_ratio)
+print("EBITDA per Share:", ebitda_per_share)
+print("EPS:", eps)
+print("Forward PE:", forward_pe)
+print("Earnings Growth Rate (%):", earnings_growth)
+print("PEG Ratio:", peg_ratio)
 
 from src.data.data_loader import fetch_yahoo_data as fetch_data
 start   = datetime(2000, 8, 30)

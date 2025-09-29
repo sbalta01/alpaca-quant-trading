@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # symbols = ["AAPL"]
     # symbols = ["USO"]
     # symbols = ["SPY"]
-    symbols = ["NDX"]
+    # symbols = ["NDX"]
     # symbols = ["AAPL","AMZN","MSFT","GOOG","VRTX"]
     # symbols = ["MSFT"]
     # symbols = ["NVDA"]
@@ -52,6 +52,8 @@ if __name__ == "__main__":
 
     # symbols = ["CRWV"] #Too new to train in LSTM
 
+    symbols = ["PCG"]
+
     # fetch_sp500_symbols()
     sp500 = pd.read_csv("sp500.csv")["Symbol"].to_list()
     sp500.remove('CEG')
@@ -60,7 +62,7 @@ if __name__ == "__main__":
     sp500.remove('VLTO')
     # symbols = sp500
 
-    symbols = fetch_nasdaq_100_symbols()
+    # symbols = fetch_nasdaq_100_symbols()
 
     start   = datetime(2015, 9, 1)
     # start   = datetime(2025, 1, 5)

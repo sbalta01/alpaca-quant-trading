@@ -161,13 +161,14 @@ def plot_candles_with_macd(df, animate = False):
                         mpf.make_addplot(exp26,color='c',ax=ax_emav),
                         mpf.make_addplot(histogram,type='bar',width=0.7,
                                         color='dimgray',alpha=1,ax=ax_hisg),
-                        mpf.make_addplot(macd,color='fuchsia',ax=ax_macd),
-                        mpf.make_addplot(signal,color='b',ax=ax_sign, linestyle = '--'),
+                        mpf.make_addplot(macd,color='fuchsia',ax=ax_macd, legend = "MACD"),
+                        mpf.make_addplot(signal,color='b',ax=ax_sign, linestyle = '--', legend = "Signal Line"),
                     ]
 
                 for ax in axes:
                     ax.clear()
                 mpf.plot(data,type='candle',addplot=apds,ax=ax_main,volume=ax_volu)
+                mpf.legend()
 
             ani = animation.FuncAnimation(fig,animate,interval=100)
         # plt.show()
