@@ -19,32 +19,44 @@ jobs:
       PAPER: True
 
     steps:
-      - name: Checkout repo (with write access)
-        uses: actions/checkout@v3
+      - name: Checkout repo (shallow)
+        uses: actions/checkout@v4
         with:
-          # so the checkout action configures Git with the GITHUB_TOKEN
           persist-credentials: true
-          fetch-depth: 0
+          fetch-depth: 1
+
+      # Optional but very helpful on space-constrained jobs. Remove only what you don't use.
+      - name: Free disk space (remove unused SDKs)
+        run: |
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet      || true
+          sudo rm -rf /opt/ghc               || true
+          sudo rm -rf /usr/local/.ghcup      || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+          df -h
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.13
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          # Use a version with widespread manylinux/macos wheels to avoid building from source
+          python-version: '3.11'
+          # Avoid runner disk usage from pip cache
+          cache: 'none'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install dependencies (no pip cache)
+        run: |
+          python -m pip install -U pip
+          # Prefer wheels to avoid bulky source builds (doesn't hard-fail if a wheel isn't available)
+          pip install --no-cache-dir --prefer-binary -r requirements.txt
+          # Belt & suspenders: ensure any residual caches are cleared
+          pip cache purge || true
+          df -h
 
       - name: Deploy portfolio rebalance
         env:
-            PYTHONPATH: ${{ github.workspace }}
-        
+          PYTHONPATH: ${{ github.workspace }}
         run: python main/rebalance_portfolio.py
 
       - name: Commit & push changes
@@ -52,7 +64,6 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add live_portfolio_rebalance.md
-          # Only commit if there are changes
           if ! git diff --cached --quiet; then
             git commit -m "Auto-update live_portfolio_rebalance"
             git push
@@ -63,16 +74,12 @@ jobs:
       - name: Send report as email body
         uses: dawidd6/action-send-mail@v6
         with:
-          # either via connection_url or broken-out parameters:
           server_address: ${{ secrets.SMTP_SERVER }}
           server_port:    ${{ secrets.SMTP_PORT }}
           username:       ${{ secrets.SMTP_USERNAME }}
           password:       ${{ secrets.SMTP_PASSWORD }}
-
           subject:        "Monthly Portfolio Rebalance Report"
           from:           ${{ secrets.SMTP_USERNAME }}
           to:             ${{ secrets.SMTP_USERNAME }}
-
-          # key bit: load the entire JSON file as the e‑mail body
           content_type:   text/plain
           body:           file://live_portfolio_rebalance.md
