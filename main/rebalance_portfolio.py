@@ -137,7 +137,7 @@ def main():
     start = now_utc - timedelta(days= 2* 365) #Dataset for fitting the GBM parameters
     timeframe = "1d"
     update_portfolio_horizon = 30
-    initial_investment = 56_000 #56_000 for nas100 tickers at 2025-07-22
+    initial_investment = 50_000 #50_000 for nas100 tickers at 2025-11-10
 
     market_hols = holidays.financial_holidays("NYSE")
     today = now_utc.date()
