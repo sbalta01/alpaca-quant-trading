@@ -43,7 +43,6 @@ jobs:
           # Use a version with widespread manylinux/macos wheels to avoid building from source
           python-version: '3.11'
           # Avoid runner disk usage from pip cache
-          cache: 'none'
 
       - name: Install dependencies (no pip cache)
         run: |
