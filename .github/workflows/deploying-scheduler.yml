@@ -55,17 +55,17 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: python main/deploy.py
 
-      - name: Commit & push changes
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add trades_info.json live_trading_report.md
-          if ! git diff --cached --quiet; then
-            git commit -m "Auto-update trades_info.json"
-            git push
-          else
-            echo "No changes to commit."
-          fi
+      # - name: Commit & push changes
+      #   run: |
+      #     git config user.name  "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      #     git add trades_info.json live_trading_report.md
+      #     if ! git diff --cached --quiet; then
+      #       git commit -m "Auto-update trades_info.json"
+      #       git push
+      #     else
+      #       echo "No changes to commit."
+      #     fi
 
       - name: Send report as email body
         uses: dawidd6/action-send-mail@v6
