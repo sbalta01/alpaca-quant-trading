@@ -7,10 +7,14 @@ Leverages PyTorch (via Skorch), scikit‑learn, XGBoost, Optuna, and pandas to b
 
 ---
 
+<<<<<<< Updated upstream
 ## 📂 Repository Structure
 All code to be deployed, either locally or through Alpaca, is located inside main/ folder.
 src/ contains all modules: strategies, utils, backtesting engine, execution engine, data fetching, etc.
 
+=======
+## Repository Structure
+>>>>>>> Stashed changes
     alpaca-quant-trading/
     ├── main/
     │ ├── backtest.py
