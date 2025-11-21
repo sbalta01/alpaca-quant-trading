@@ -47,7 +47,7 @@ alpaca-quant-trading/
 ## Installation
 
 ```bash
-git clone https://github.com/your-org/quant-trading.git
+git clone https://github.com/sbalta01/alpaca-quant-trading.git
 cd quant-trading
 
 python3 -m venv venv
