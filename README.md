@@ -1,4 +1,5 @@
 # Quantitative Trading Framework
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 A modular Python framework for **developing, backtesting, and deploying systematic trading strategies**.  
 Built for experimentation with machine learning, technical indicators, and production-ready execution pipelines.
