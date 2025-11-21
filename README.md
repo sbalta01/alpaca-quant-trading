@@ -33,7 +33,7 @@ src/ contains all modules: strategies, utils, backtesting engine, execution engi
     └── README.md 
 
 ---
-## 🚀 Installation
+## Installation
 
 ```bash
 git clone https://github.com/your‑org/quant‑trading.git
