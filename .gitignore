@@ -8,3 +8,5 @@ clstm_ppo_stock.zip
 models
 trial.py
 count_lines.py
+live_trading_report.md
+live_portfolio_rebalance.md
