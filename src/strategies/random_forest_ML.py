@@ -8,12 +8,12 @@ from src.utils.tools import sma, rsi
 
 class RandomForestStrategy(Strategy):
     """
-    ML‐based strategy based on a random forest classifier:
+    ML-based strategy based on a random forest classifier:
       - Features: lagged returns, SMA deviation, RSI
       - Model: RandomForestClassifier
       - Train on the first `train_frac` of data, predict on the remainder
       - Generates:
-         signal = +1 if model predicts positive next‐day return AND not currently long
+         signal = +1 if model predicts positive next-day return AND not currently long
          signal = -1 if model predicts negative return AND currently long
          signal = 0 otherwise
     """

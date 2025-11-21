@@ -12,7 +12,7 @@ def sharpe_from_signals(y_true: np.ndarray, y_pred: np.ndarray, freq: float = 25
     """
     # 1) build positions: -1, 0 or +1
     pos = np.sign(y_pred)
-    # 2) shift positions by 1 day (can't trade same day you predict)
+    # 2) shift positions by 1 day 
     pos_lag = np.concatenate([[0.0], pos[:-1]])
     # 3) P&L series
     pnl = pos_lag * y_true

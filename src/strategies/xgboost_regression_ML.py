@@ -156,7 +156,6 @@ class XGBoostRegressionStrategy(Strategy):
             max_depth      = trial.suggest_int("max_depth",    1, 10)
             learning_rate  = trial.suggest_float("learning_rate", 1e-3, 2.0, log=True)
             subsample      = trial.suggest_float("subsample",     0.5, 1.0)
-            # build a temporary model + pipeline
             model = XGBRegressor(
                 objective=self.objective,
                 quantile_alpha = self.quantile,
@@ -173,7 +172,6 @@ class XGBoostRegressionStrategy(Strategy):
             ('model', model),
                             ])
             tscv = TimeSeriesSplit(n_splits=self.cv_splits)
-            # cross-validate with your sharpe_scorer
             returns = []
             for train_idx, val_idx in tscv.split(X_train_CV):
                 pipe.fit(X_train_CV.iloc[train_idx], y_train_CV.iloc[train_idx])
@@ -232,7 +230,7 @@ class XGBoostRegressionStrategy(Strategy):
             ranking = rfecv_pipe.named_steps['rfecv'].ranking_
             print(f"[{self.name}] RFECV selected {len(selected)}/{len(feature_names)} features. Ranking:")
             for feature_name, rank in zip(feature_names, ranking):
-                print(f"{feature_name:15s} → rank {rank}")
+                print(f"{feature_name:15s} --> rank {rank}")
         else:
             selected = X_train_CV.columns
             print("No feature selection. Number of features:", len(selected))
@@ -293,7 +291,7 @@ class XGBoostRegressionStrategy(Strategy):
         # search = self.pipeline
         search.fit(X_train, y_train)
 
-        # 5) Evaluate R²
+        # 5) Evaluate R2
         y_pred = pd.Series(search.predict(X_test), index=X_test.index)
         
         r2_train = r2_score(y_train, search.predict(X_train))

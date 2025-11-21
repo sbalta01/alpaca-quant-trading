@@ -17,9 +17,9 @@ from src.utils.tools import remove_outliers, sma, ema, rsi, threshold_adjust
 
 class AdaBoostStrategy(Strategy):
     """
-    Predict the sign of ΔMA(d) = MA(d)_{t+1} - MA(d)_t using AdaBoost + GridSearchCV.
-    Features: 32 from your table (price, volume, MA, EMA, RSI, OBV, ROC, MACD, Stoch, CCI).
-    Target: sign of ΔMA(d) for d in {5,10,20}.
+    Predict the sign of DeltaMA(d) = MA(d)_{t+1} - MA(d)_t using AdaBoost + GridSearchCV.
+    Features: 32 (price, volume, MA, EMA, RSI, OBV, ROC, MACD, Stoch, CCI).
+    Target: sign of DeltaMA(d) for d in {5,10,20}.
     """
     name = "AdaBoost"
     multi_symbol = False
@@ -64,7 +64,7 @@ class AdaBoostStrategy(Strategy):
             random_state=self.random_state
             )
 
-        #Pipeline: scale → RFECV(AdaBoost) (with inner CV) → final estimator
+        #Pipeline: scale --> RFECV(AdaBoost) (with inner CV) --> final estimator
         inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),
@@ -79,9 +79,7 @@ class AdaBoostStrategy(Strategy):
         ])
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute the 32 features from your table."""
         df = df.copy()
-        # Basic price & lag
         df['open'] = df['open']
         df['high'] = df['high']
         df['low']  = df['low']
@@ -89,45 +87,36 @@ class AdaBoostStrategy(Strategy):
         df['close_1'] = df['close'].shift(1)
         df['close_inc'] = df['close'] - df['close_1']
 
-        # Volume features
         df['volume'] = df['volume']
         df['volume_1'] = df['volume'].shift(1)
         df['volume_inc'] = df['volume'] - df['volume_1']
 
-        # Moving Averages
         for w in (5,10,20):
             df[f'MA{w}'] = sma(df['close'], w)
             df[f'MA{w}_1'] = df[f'MA{w}'].shift(1)
             df[f'MA{w}_inc'] = df[f'MA{w}'] - df[f'MA{w}_1']
 
-        # EMAs
         for w in (5,10,20):
             df[f'EMA{w}'] = ema(df['close'], w)
 
-        # RSI
         df['RSI'] = rsi(df['close'], 12)
 
-        # OBV
         df['OBV'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
 
-        # ROC
         for w in (5,10,20):
             df[f'ROC{w}'] = df['close'].pct_change(w) * 100
 
-        # MACD (12,26) + Signal(9)
         df['EMA12'] = ema(df['close'], 12)
         df['EMA26'] = ema(df['close'], 26)
         df['MACD'] = df['EMA12'] - df['EMA26']
         df['MACDsignal'] = ema(df['MACD'], 9)
         df['MACDhist']   = df['MACD'] - df['MACDsignal']
 
-        # Stochastic Oscillator %K(3), %D(3)
         low_min  = df['low'].rolling(3).min()
         high_max = df['high'].rolling(3).max()
         df['slowk'] = 100 * (df['close'] - low_min) / (high_max - low_min)
         df['slowd'] = df['slowk'].rolling(3).mean()
 
-        # CCI(10)
         tp = (df['high'] + df['low'] + df['close']) / 3
         ma_tp = tp.rolling(10).mean()
         mean_dev = tp.rolling(10).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
@@ -139,7 +128,6 @@ class AdaBoostStrategy(Strategy):
         df = data.copy()
         # 1) Build features & target
         feat = self._compute_features(df)
-        # target = sign of ΔMA(d)
         feat['target'] = (feat[f'MA{self.d}'].shift(-1) > feat[f'MA{self.d}'])
         feat['target'] = feat['target'].astype(int)
         feat = feat.ffill().dropna()  #Ffill so that we dont lose last rows to dropping Nas.
@@ -147,7 +135,7 @@ class AdaBoostStrategy(Strategy):
         # 2) Remove outliers
         feat = remove_outliers(feat, ratio_outliers=self.ratio_outliers)
 
-        # 3) Split train / val / test (no shuffle)
+        # 3) Split train / val / test
         X = feat.drop(columns=['target'])
         y = feat['target']
 
@@ -160,7 +148,6 @@ class AdaBoostStrategy(Strategy):
         if isinstance(self.param_grid, dict) and all(
             hasattr(v, "rvs") for v in self.param_grid.values()
         ):
-            # The user did NOT supply a fixed grid then use RandomizedSearchCV
             gs = RandomizedSearchCV(
                 estimator=self.pipeline,
                 param_distributions=self.param_grid,
@@ -172,7 +159,6 @@ class AdaBoostStrategy(Strategy):
             )
             print('Random Search CV')
         else:
-            # User supplied a fixed param_grid then exhaustive GridSearch
             gs = GridSearchCV(
                 estimator=self.pipeline,
                 param_grid=self.param_grid,

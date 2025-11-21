@@ -19,7 +19,7 @@ from src.utils.tools import remove_outliers
 class PenalizedRegressionStrategy(Strategy):
     """
     Predict next-bar return with ElasticNet + RFECV + GridSearchCV,
-    then go long if pred>0 & flat→long, short if pred<0 & long→flat, etc.
+    then go long if pred>0 & flat-->long, short if pred<0 & long-->flat, etc.
     """
     name = "PenalizedRegression"
     multi_symbol = False
@@ -51,7 +51,7 @@ class PenalizedRegressionStrategy(Strategy):
             'reg__l1_ratio': uniform(0.01, 0.99)
         }
 
-        # pipeline: scale → RFECV(ElasticNet) → final ElasticNet
+        # pipeline: scale --> RFECV(ElasticNet) --> final ElasticNet
         inner_cv = TimeSeriesSplit(n_splits=self.cv_splits)
         self.pipeline = Pipeline([
             ('scaler', StandardScaler()),

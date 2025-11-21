@@ -36,7 +36,7 @@ class AttentionLSTMRegressor(nn.Module):
     1) Dynamic feature-level attention per time step
     2) LSTM over the attended inputs
     3) Temporal attention over the LSTM outputs
-    4) Final Dense → logit
+    4) Final Dense --> logit
     """
     def __init__(self, n_features, with_feature_attn: bool, hidden_size=128, dropout=0.2, attn_dim = 64,):
         super().__init__()
@@ -44,15 +44,15 @@ class AttentionLSTMRegressor(nn.Module):
         self.lstm      = nn.LSTM(
                                 input_size=n_features,
                                 hidden_size=hidden_size,
-                                num_layers  = 2,           # two stacked layers #New
-                                bidirectional = True,      # bidirectional #New
+                                num_layers  = 2,           # two stacked layers 
+                                bidirectional = True,      # bidirectional 
                                 batch_first=True
                                 )
         # self.temp_attn = TemporalAttention(hidden_size, attn_dim=attn_dim)
-        self.temp_attn = TemporalAttention(hidden_size * 2, attn_dim=attn_dim) #New
+        self.temp_attn = TemporalAttention(hidden_size * 2, attn_dim=attn_dim) 
         self.drop      = nn.Dropout(dropout)
         # self.out       = nn.Linear(hidden_size, 1)
-        self.out   = nn.Linear(hidden_size * 2, 1) # bidirectional doubles the hidden dimension #New
+        self.out   = nn.Linear(hidden_size * 2, 1) # bidirectional doubles the hidden dimension 
 
         self.with_feature_attn = with_feature_attn
 
@@ -145,12 +145,9 @@ class SequenceBaggingRegressor(BaseEstimator, RegressorMixin):
         X = np.asarray(X)
         # collect shape: (n_estimators, n_samples, n_classes)
         all_preds = [est.predict(X) for est in self.estimators_]
-        # mean over estimators → (n_samples, n_classes)
+        # mean over estimators --> (n_samples, n_classes)
         return np.mean(all_preds, axis=0)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
 
 class LSTMRegressionStrategy(Strategy):
     """
@@ -280,10 +277,10 @@ class LSTMRegressionStrategy(Strategy):
             batch_size  = trial.suggest_categorical("batch_size", [16, 32, 64])
             max_epochs  = trial.suggest_int("max_epochs",  5, 20)
             
-            # 2) Build a fresh skorch net with your LSTM Regressor
+            # 2) Build a skorch net with LSTM Regressor
             net = NeuralNetRegressor(
                 module              = AttentionLSTMRegressor,
-                module__n_features  = n_feats,               # your feature‐count
+                module__n_features  = n_feats, 
                 module__hidden_size = hidden_size,
                 module__attn_dim    = attn_dim,
                 module__dropout     = dropout,
@@ -297,7 +294,7 @@ class LSTMRegressionStrategy(Strategy):
                 batch_size          = batch_size,
                 max_epochs          = max_epochs,
             
-                train_split         = None,   # we’ll handle CV ourselves
+                train_split         = None, 
                 iterator_train__shuffle = False,
                 callbacks = [
                         ('early_stop',

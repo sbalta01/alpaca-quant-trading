@@ -55,7 +55,7 @@ class DynamicFeatureAttention(nn.Module):
         scores  = self.W2(h)                         # [B*T, F]
         scores = scores / math.sqrt(F_)
         alpha       = F.softmax(scores, dim=-1)          # attention per feature
-        # re-shape alpha → [B, T, F]
+        # re-shape alpha --> [B, T, F]
         alpha = alpha.view(B, T, F_)
         # weighted input
         # return X * alpha
@@ -66,10 +66,10 @@ class DynamicFeatureAttention(nn.Module):
 
 class TemporalAttention(nn.Module):
     """
-    Given LSTM outputs H ∈ R^{B*T*H}, computes an attention
+    Given LSTM outputs H \in R^{B*T*H}, computes an attention
     over the time dimension and returns a single context vector:
-      β = softmax( v^T tanh(W H + b) )
-      context = Σ_t β_t H_t
+      beta = softmax( v^T tanh(W H + b) )
+      context = sigma_t beta_t H_t
     """
     def __init__(self, hidden_size, attn_dim=64):
         super().__init__()
@@ -84,9 +84,9 @@ class TemporalAttention(nn.Module):
         h_flat = H.contiguous().view(B * T, Hdim)
         u      = torch.tanh(self.W(h_flat))             # [B*T, attn_dim]
         e      = self.v(u).view(B, T)                   # [B, T]
-        β      = F.softmax(e, dim=1).unsqueeze(-1)       # [B, T, 1]
+        beta      = F.softmax(e, dim=1).unsqueeze(-1)       # [B, T, 1]
         # context: weighted sum over time
-        context = (H * β).sum(dim=1)                     # [B, H]
+        context = (H * beta).sum(dim=1)                     # [B, H]
         # return context
         # residual from last LSTM hidden
         res = H[:, -1, :]
@@ -98,7 +98,7 @@ class AttentionLSTMClassifier(nn.Module):
     1) Dynamic feature-level attention per time step
     2) LSTM over the attended inputs
     3) Temporal attention over the LSTM outputs
-    4) Final Dense → logit
+    4) Final Dense --> logit
     """
     def __init__(self, n_features, with_feature_attn: bool, hidden_size=32, dropout=0.2, attn_dim = 16,):
         super().__init__()
@@ -106,15 +106,15 @@ class AttentionLSTMClassifier(nn.Module):
         self.lstm      = nn.LSTM(
                                 input_size=n_features,
                                 hidden_size=hidden_size,
-                                num_layers  = 2,           # two stacked layers #New
-                                bidirectional = True,      # bidirectional #New
+                                num_layers  = 2,           # two stacked layers 
+                                bidirectional = True,      # bidirectional 
                                 batch_first=True
                                 )
         # self.temp_attn = TemporalAttention(hidden_size, attn_dim=attn_dim)
-        self.temp_attn = TemporalAttention(hidden_size * 2, attn_dim=attn_dim) #New
+        self.temp_attn = TemporalAttention(hidden_size * 2, attn_dim=attn_dim) 
         self.drop      = nn.Dropout(dropout)
         # self.out       = nn.Linear(hidden_size, 1)
-        self.out   = nn.Linear(hidden_size * 2, 1) # bidirectional doubles the hidden dimension #New
+        self.out   = nn.Linear(hidden_size * 2, 1) # bidirectional doubles the hidden dimension 
 
         self.with_feature_attn = with_feature_attn
 
@@ -136,7 +136,6 @@ class AttentionLSTMClassifier(nn.Module):
             h = self.drop(h)                 # [B, 1]
             return self.out(h).squeeze(-1) # [B]
 
-# ──────────────────────────────────────────────────────────────────────────────
 
 class TimeSeriesScaler(TransformerMixin, BaseEstimator):
     """
@@ -145,7 +144,6 @@ class TimeSeriesScaler(TransformerMixin, BaseEstimator):
     Expects X of shape (n_samples, seq_len, n_features).
     """
     def __init__(self, scaler=None):
-        # allow passing in a custom scaler like MinMaxScaler if you want
         self.scaler = scaler or StandardScaler()
 
     def fit(self, X, y=None):
@@ -162,7 +160,6 @@ class TimeSeriesScaler(TransformerMixin, BaseEstimator):
         flat_scaled = self.scaler.transform(flat)
         return flat_scaled.reshape(n_s, t, n_f)
 
-# ──────────────────────────────────────────────────────────────────────────────
 
 class FocalLoss(nn.BCEWithLogitsLoss):
     """
@@ -176,7 +173,6 @@ class FocalLoss(nn.BCEWithLogitsLoss):
         self.gamma = gamma
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        # BCE part (still uses the internal weight/bias machinery of BCEWithLogitsLoss)
         bce = super().forward(logits, targets)
 
         # p_t = {p if y=1; 1-p if y=0}
@@ -196,7 +192,6 @@ class FocalLoss(nn.BCEWithLogitsLoss):
             return loss
         
 
-# ──────────────────────────────────────────────────────────────────────────────
 class SequenceBaggingClassifier(BaseEstimator, ClassifierMixin):
     """
     A simple bootstrap-bagging ensemble for sequence data (3D X).
@@ -268,7 +263,7 @@ class SequenceBaggingClassifier(BaseEstimator, ClassifierMixin):
         X = np.asarray(X)
         # collect shape: (n_estimators, n_samples, n_classes)
         all_probs = [est.predict_proba(X) for est in self.estimators_]
-        # mean over estimators → (n_samples, n_classes)
+        # mean over estimators --> (n_samples, n_classes)
         return np.mean(all_probs, axis=0)
 
     def predict(self, X):
@@ -278,7 +273,6 @@ class SequenceBaggingClassifier(BaseEstimator, ClassifierMixin):
         probs = self.predict_proba(X)
         return (probs[:, 1] >= 0.5).astype(int)
     
-# ──────────────────────────────────────────────────────────────────────────────
 
 class SequenceSelectKBest(BaseEstimator, TransformerMixin):
     """
@@ -314,7 +308,6 @@ class SequenceSelectKBest(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        # just index into the feature axis
         return X[:, :, self.support_]
 
     def get_support(self):
@@ -322,9 +315,10 @@ class SequenceSelectKBest(BaseEstimator, TransformerMixin):
         return self.support_
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
+
+
+
+
 
 class LSTMEventTechnicalStrategy(Strategy):
     """
@@ -481,8 +475,8 @@ class LSTMEventTechnicalStrategy(Strategy):
 
 
         
-        # df = df.drop(columns=['open','high','low','close','volume']) #Optionally drop these columns
-        df = df.drop(columns=['open','high','low']) #Optionally drop these columns
+        # df = df.drop(columns=['open','high','low','close','volume'])
+        df = df.drop(columns=['open','high','low'])
         return df
 
     def hyperparameter_fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame):
@@ -502,10 +496,10 @@ class LSTMEventTechnicalStrategy(Strategy):
             alpha       = trial.suggest_float("alpha",  0.1, 2)
             gamma       = trial.suggest_float("gamma",  0.25, 2)
             
-            # 2) Build a fresh skorch net with your LSTM Classifier
+            # 2) Build a skorch net with LSTM Classifier
             net = NeuralNetClassifier(
                 module              = AttentionLSTMClassifier,
-                module__n_features  = n_feats,               # your feature‐count
+                module__n_features  = n_feats,            
                 module__hidden_size = hidden_size,
                 module__attn_dim    = attn_dim,
                 module__dropout     = dropout,
@@ -519,7 +513,7 @@ class LSTMEventTechnicalStrategy(Strategy):
                 batch_size          = batch_size,
                 max_epochs          = max_epochs,
             
-                train_split         = None,   # we’ll handle CV ourselves
+                train_split         = None,
                 iterator_train__shuffle = False,
                 callbacks = [
                         ('early_stop',
@@ -913,7 +907,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         auc_train  = roc_auc_score(y, y_prob)
         print(f"ROC AUC (Train): {auc_train:.3f}")
 
-        # 3) Save it:
+        # 3) Save:
         p = Path(model_path)
         p.parent.mkdir(exist_ok=True, parents=False)
         joblib.dump(self.final_model, str(p))
@@ -934,7 +928,7 @@ class LSTMEventTechnicalStrategy(Strategy):
         # 1) Compute features on the full window
         feat = self._compute_features(data)
         feat = feat.dropna()
-        feat_last = feat.iloc[-self.sequences_length - 1 - smoothing_window + 1:] #Keep only those lines necessary to build the last #smoothing_window# sequences
+        feat_last = feat.iloc[-self.sequences_length - 1 - smoothing_window + 1:] 
         time_last = list(feat_last.index)
 
         def make_sequences_X_times(X_arr, times_arr):

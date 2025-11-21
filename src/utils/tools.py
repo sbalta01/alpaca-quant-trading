@@ -23,7 +23,6 @@ def rsi(series: pd.Series, window: int = 14) -> pd.Series:
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
 
-    # Use exponential moving average for RSI by convention
     avg_gain = gain.rolling(window=window).mean()
     avg_loss = loss.rolling(window=window).mean()
 
@@ -46,7 +45,7 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series, window: int = 14) -> 
     pd.Series
         ADX values, aligned with `close` index.
     """
-    # 1) True Range (TR)
+    # 1) True Range 
     tr1 = high - low
     tr2 = (high - close.shift()).abs()
     tr3 = (low  - close.shift()).abs()
@@ -146,7 +145,6 @@ def compute_turbulence_single_symbol(
 
     tur_vals = []
     # 2) For each date, compute 1D Mahalanobis distance:
-    #    (r - μ)^2 / σ^2  over the prior `window` returns.
     for i, date in enumerate(dates):
         if i < window:
             tur_vals.append(0.0)

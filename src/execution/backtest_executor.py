@@ -18,7 +18,7 @@ def run_backtest_strategy(
     symbols: Union[str, List[str]],
     start: datetime,
     end: datetime,
-    timeframe: TimeFrame,  # e.g. TimeFrame.Day. Fetch data time frame.
+    timeframe: TimeFrame,  # e.g. TimeFrame.Day
     initial_cash_per_stock: float = 10_000.0,
     feed: str = 'iex',
     fit_and_save: bool = False,
@@ -152,7 +152,7 @@ def run_backtest_strategy(
         pass
 
     print(f"\n--- Backtest: {strategy.name} on {symbols} ---")
-    print(f"Period       : {start_control} → {end}")
+    print(f"Period       : {start_control} --> {end}")
     print(f"Initial Cash       : {perf['Initial Cash']:.2f}")
     print(f"Final Equity       : {perf['Final Equity']:.2f}  |  Benchmark: {perf_ctrl['Final Equity']:.2f}")
     print(f"Profit       : {perf['Profit']:.2f}  |  Benchmark: {perf_ctrl['Profit']:.2f}")

@@ -9,7 +9,7 @@ from src.strategies.adaboost_ML import AdaBoostStrategy
 class MomentumRankingAdaBoostStrategy(Strategy):
     """
     Train each symbol's AdaBoostMAPredictor once, then at each test timestamp
-    rank symbols by predicted up‐move probability and go long the top_k.
+    rank symbols by predicted up-move probability and go long the top_k.
     """
     name = "MomentumRankingAdaBoost"
     multi_symbol = True

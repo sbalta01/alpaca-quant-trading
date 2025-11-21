@@ -24,7 +24,6 @@ from pykalman import KalmanFilter
 from src.strategies.base_strategy import Strategy
 from src.utils.tools import sma, ema, rsi
 
-# ──────────────────────────────────────────────────────────────────────────────
 def adf_test(series, signif=0.05):
     """
     Perform ADF test and return True if we reject the unit-root null
@@ -34,7 +33,7 @@ def adf_test(series, signif=0.05):
     _, pvalue, _, _, _, _  = res
     return pvalue < signif
 
-# ─── ARIMA/GARCH/Kalman ────────────────────────────────────────────────────────────────────
+# ARIMA/GARCH/Kalman
 class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
     """Add ARIMA residuals, GARCH vol forecast & Kalman trend to your DataFrame."""
 
@@ -67,9 +66,9 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
         """
         1) Compute log-returns on the full training slice.
         2) For each (p,d,q) * (p',q') * q_obs:
-             • Fit ONE ARIMA on the entire train returns → get AIC
-             • Fit ONE GARCH on train returns → get AIC
-             • Fit ONE Kalman EM on train returns → reconstruct log-likelihood or MSE
+             - Fit ONE ARIMA on the entire train returns --> get AIC
+             - Fit ONE GARCH on train returns --> get AIC
+             - Fit ONE Kalman EM on train returns --> reconstruct log-likelihood or MSE
         3) Pick the triple that minimizes (AIC_arima + AIC_garch + Kalman_MSE).
         """
         df = X_train.copy()
@@ -119,7 +118,6 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
                 observation_covariance=np.eye(1)*kq
             )
             kf_em = kf.em(ret.values, n_iter=5)
-            # use total squared error of the smoothed trend as a proxy
             trend, _ = kf_em.filter(ret.values)
             mse = np.mean((ret.values - trend.flatten())**2)
             score_kalman += mse
@@ -230,7 +228,6 @@ class ARIMAGARCHKalmanTransformer(BaseEstimator, TransformerMixin):
         }, index=df.index)
         return pd.concat([df,out], axis=1).dropna()
 
-# ─── TechnicalTransformer unchanged except dropna removal ──────────────────────────
 class TechnicalTransformer(BaseEstimator, TransformerMixin):
     """Add a few technical indicators via `src.utils.indicators`."""
     def fit(self, X, y=None):
@@ -244,9 +241,8 @@ class TechnicalTransformer(BaseEstimator, TransformerMixin):
         return df.dropna()
 
 
-# ─── LSTM module unchanged ───────────────────────────────────────────────────────
 class LSTMClassifierModule(nn.Module):
-    """Simple 1-layer LSTM → Dropout → Dense(sigmoid) classifier."""
+    """Simple 1-layer LSTM --> Dropout --> Dense(sigmoid) classifier."""
     def __init__(self, n_features, hidden_size=32, dropout=0.2):
         super().__init__()
         self.lstm = nn.LSTM(input_size=n_features,
@@ -263,7 +259,6 @@ class LSTMClassifierModule(nn.Module):
         # return self.act(self.fc(h)).squeeze()
         return self.fc(h).squeeze(-1)
 
-# ──────────────────────────────────────────────────────────────────────────────
 
 class TimeSeriesScaler(TransformerMixin, BaseEstimator):
     """
@@ -272,7 +267,6 @@ class TimeSeriesScaler(TransformerMixin, BaseEstimator):
     Expects X of shape (n_samples, seq_len, n_features).
     """
     def __init__(self, scaler=None):
-        # allow passing in a custom scaler like MinMaxScaler if you want
         self.scaler = scaler or StandardScaler()
 
     def fit(self, X, y=None):
@@ -289,7 +283,6 @@ class TimeSeriesScaler(TransformerMixin, BaseEstimator):
         flat_scaled = self.scaler.transform(flat)
         return flat_scaled.reshape(n_s, t, n_f)
 
-# ──────────────────────────────────────────────────────────────────────────────
 
 class LSTMEventStrategy(Strategy):
     """

@@ -40,7 +40,7 @@ def get_target_positions(symbols: list, start: datetime, end: datetime, timefram
 
     n_symbols = len(symbols)
     monte_carlo_simulator = monte_carlo_portfolio_risk( #10-day horizon over >250 days of data is good
-        price_hist   = df,                    # multiindex or wide
+        price_hist   = df,           
         T            = (predict_horizon + 1)/252, #In years. n_steps = T - 1
         dt           = 1/252, #1/252 = 1 day
         n_sims       = 10_000,
@@ -74,7 +74,7 @@ def get_current_positions() -> dict:
     Returns dict of ticker -> quantity (int).
     """
     positions = trading_client.get_all_positions()
-    return {pos.symbol: float(pos.qty) * float(pos.current_price) for pos in positions} #Returns current equity for each symbol in dollars
+    return {pos.symbol: float(pos.qty) * float(pos.current_price) for pos in positions}
 
 
 def rebalance_portfolio(targets: dict, current: dict, initial_investment: float, md_report_file_path: str):
@@ -86,7 +86,7 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
     for symbol, _ in targets.items():
         total_portfolio_notional += current.get(symbol, 0)
     for symbol, target_proportion in targets.items():
-        current_notional = current.get(symbol, 0) #Return the value for key if key is in the dictionary, else default.
+        current_notional = current.get(symbol, 0)
         target_notional = total_portfolio_notional*target_proportion #Every time I rebalance, I always keep whatever the total equity is, and not realize any differences
         delta = target_notional - current_notional
         if abs(delta) < 1: #No trades below 1$ are allowed in Alpaca
@@ -96,7 +96,7 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
         side = OrderSide.BUY if delta > 0 else OrderSide.SELL
         qty_to_order = round(abs(delta),2)
         try:
-            if abs(target_notional) < 1: #If the new target is almost 0 then sell everything
+            if abs(target_notional) < 1: #If the new target is almost 0 then just sell everything
                 qty_to_order = trading_client.get_open_position(symbol).qty_available
                 order = MarketOrderRequest(
                     symbol=symbol,
@@ -130,11 +130,10 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
 
 def main():
     md_report_file_path = "live_portfolio_rebalance.md"
-    open(md_report_file_path, "w", encoding="utf-8").close() #Clear report
+    open(md_report_file_path, "w", encoding="utf-8").close() 
 
-    # Available for tuning
     now_utc = datetime.now(tz=timezone.utc)
-    start = now_utc - timedelta(days= 2* 365) #Dataset for fitting the GBM parameters
+    start = now_utc - timedelta(days= 2* 365) 
     timeframe = "1d"
     update_portfolio_horizon = 30
     initial_investment = 50_000 #50_000 for nas100 tickers at 2025-11-10
@@ -177,7 +176,7 @@ def main():
 
     rebalance_portfolio(targets, current, initial_investment, md_report_file_path=md_report_file_path)
 
-    with open(md_report_file_path, "a", encoding="utf-8") as md_file: # Update report
+    with open(md_report_file_path, "a", encoding="utf-8") as md_file: 
         md_file.write("\n")
         md_file.write(f"{now_utc}: Rebalance completed.\nNext run in {update_portfolio_horizon} days (Double check GitHub scheduler's time).")
 

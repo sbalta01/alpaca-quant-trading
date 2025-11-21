@@ -67,7 +67,6 @@ class CointegrationPairTradingStrategy(Strategy):
                 good_pairs.append((s1, s2))
 
         if not good_pairs:
-            # no pairs → flat for everyone
             out = data.copy()
             out["position"] = 0.0
             out["signal"] = 0.0
@@ -75,7 +74,7 @@ class CointegrationPairTradingStrategy(Strategy):
             return out
 
         # 4) For each good pair, compute its z-score time series and pos1/pos2
-        # We'll build a dict: pair → DataFrame with columns {s1:pos1, s2:pos2}
+        # Build a dict: pair --> DataFrame with columns {s1:pos1, s2:pos2}
         pair_positions = {}
         for s1, s2 in good_pairs:
             spread = np.log(price[s1]) - np.log(price[s2])
@@ -115,9 +114,9 @@ class CointegrationPairTradingStrategy(Strategy):
         # 6) Build MultiIndex output
         out = data.copy()
         # position per symbol/timestamp
-        pos_flat = all_pos.stack()                # Series indexed (timestamp, symbol)
+        pos_flat = all_pos.stack()        
         pos_flat.index.names = ["timestamp","symbol"]
-        pos_flat = pos_flat.swaplevel()           # now (symbol, timestamp)
+        pos_flat = pos_flat.swaplevel()     
         out["position"] = pos_flat.reindex(out.index).fillna(0.0).clip(0,1) #No short selling by clipping
         out["signal"] = out.groupby(level="symbol")["position"].diff().fillna(0.0)
         return out

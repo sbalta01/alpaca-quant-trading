@@ -32,30 +32,25 @@ def fetch_sp500_symbols():
 #     url = "https://en.wikipedia.org/wiki/NASDAQ-100"
 #     tables = pd.read_html(url)
     
-#     # First table on the page is the component list
 #     df = tables[4]  # As of now, table 4 contains the companies
 #     symbols = df['Ticker'].tolist()
     
-#     # Some tickers have "." instead of "-", fix for Yahoo Finance
 #     symbols = [s.replace('.', '-') for s in symbols]
 #     return symbols
 
 
 def fetch_nasdaq_100_symbols():
     url = "https://en.wikipedia.org/wiki/NASDAQ-100"
-    headers = {"User-Agent": "Mozilla/5.0"}  # Pretend to be a browser
+    headers = {"User-Agent": "Mozilla/5.0"} 
     response = requests.get(url, headers=headers)
-    response.raise_for_status()  # Raise error if request failed
+    response.raise_for_status() 
     
-    # Wrap HTML string in StringIO
     html = StringIO(response.text)
     tables = pd.read_html(html)
     
-    # Find the table that contains "Ticker" (since table index can change)
     df = next(tbl for tbl in tables if "Ticker" in tbl.columns)
     
     symbols = df['Ticker'].tolist()
-    # Replace '.' with '-' for Yahoo Finance compatibility
     symbols = [s.replace('.', '-') for s in symbols]
     return symbols
 
@@ -94,19 +89,16 @@ def fetch_alpaca_data(
         timeframe=timeframe,
         start=start,
         end=end,
-        adjustment="all", #Adjust data to splits (repricing stocks) and dividends
-        feed = feed #Defaults IEX (free plan)
+        adjustment="all",
+        feed = feed #Defaults IEX
     )
     bars = client.get_stock_bars(req).df
 
-    # If a single symbol, extract that one branch of the MultiIndex:
     if isinstance(symbol, str):
         df = bars.xs(symbol, level=0).sort_index()
         df.index.name = "timestamp"
         return df
 
-    # Otherwise, return the full MultiIndex DataFrame
-    # (symbol, timestamp) → [open, high, low, close, volume]
     df = bars.sort_index()
     df.index.set_names(["symbol", "timestamp"], inplace=True)
     return df
@@ -135,25 +127,22 @@ def fetch_yahoo_data(
     timeframe: str
         Data timeframe; e.g., "1d", "1h", "5m", etc., as per yfinance API.
     """
-    # Use yfinance.download which handles both single and list tickers
     if isinstance(symbol, str):
         tickers = symbol
     else:
         tickers = " ".join(symbol)
 
-    # yfinance returns a DataFrame with columns like ('Adj Close','close'), etc.
     df = yf.download(
         tickers=tickers,
         start=start.strftime("%Y-%m-%d"),
         end=end.strftime("%Y-%m-%d"),
         interval=timeframe,
-        group_by="ticker",  # if multiple, group columns under each ticker
-        auto_adjust=False,  # do not auto‐adjust; keep raw OHLCV
+        group_by="ticker",  
+        auto_adjust=False, 
         threads=True,
         progress=False
     )
 
-    # If single symbol: df.columns = ['Open','High','Low','Close','Adj Close','Volume']
     if isinstance(symbol, str):
         df = df.rename(
             columns={
@@ -169,9 +158,6 @@ def fetch_yahoo_data(
         df.index.name = "timestamp"
         return df
 
-    # If multiple symbol: df is a DataFrame with columns MultiIndex (symbol, field)
-    # e.g., df['BMW.DE']['Open'], df['BMW.DE']['Close'], etc.
-    # We’ll stack it into a MultiIndex as [symbol, timestamp] → [open, high, low, close, volume]
     data_frames = []
     for sym in symbol:
         if (sym, "Close") not in df.columns:
@@ -189,7 +175,6 @@ def fetch_yahoo_data(
             ["open", "high", "low", "close", "volume"]
         ].dropna()
         tmp.index.name = "timestamp"
-        # Attach symbol as an outer index level
         tmp["symbol"] = sym
         tmp = tmp.reset_index().set_index(["symbol", "timestamp"])
         data_frames.append(tmp)
@@ -214,7 +199,7 @@ def fetch_fundamentals(symbols: List[str]) -> pd.DataFrame:
             'earningsGrowth': info.get('earningsQuarterlyGrowth')
         }
     df = pd.DataFrame.from_dict(data, orient='index')
-    df_clean = df.dropna(axis=1, how='any') #If there is no data for a particular variable (eg, an ETF), just drop the column
+    df_clean = df.dropna(axis=1, how='any') 
     return df_clean
 
 FAMA_FRENCH_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip"
@@ -269,7 +254,7 @@ def attach_factors(
     fetch fundamentals & macro series, then return price_df augmented
     with columns ['PE','PB','EPS','EBITDA','earningsGrowth','EURUSD','VIX','DFF','MKT','SMB','HML'].
     """
-    # 1) Extract list of symbols and overall date range
+    # 1) Extract list of symbols
     dates   = price_df.index.get_level_values('timestamp').unique()
     symbols   = price_df.index.get_level_values('symbol').unique()
     start, end = dates.min(), dates.max()
@@ -277,14 +262,14 @@ def attach_factors(
     funds = fetch_fundamentals(symbols)       # indexed by symbol
     macro = fetch_macro_series(start, end, timeframe=timeframe)    # indexed by date
 
-    # 3) Broadcast macro to each (symbol,timestamp)
+    # 3) Broadcast macro to each
     idx = price_df.index
     macro_panel = pd.DataFrame(index=idx)
     ts_dates = pd.to_datetime(idx.get_level_values('timestamp').normalize())
     for col in macro.columns:
         macro_panel[col] = macro[col].reindex(ts_dates).values
 
-    # Optional) Broadcast fundamentals to each symbol-date
+    # Broadcast fundamentals to each symbol-date
     if with_fundamentals:
         funds_panel = pd.DataFrame(index=idx)
         for col in funds.columns:

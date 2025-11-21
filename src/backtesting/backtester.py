@@ -9,7 +9,7 @@ from src.strategies.base_strategy import Strategy
 
 class BacktestEngine:
     """
-    A simple backtest engine that:
+    A backtest engine that:
       - Takes a Strategy instance and historical price data (DataFrame).
       - Calls strategy.generate_signals(data) to get 'signal' & (new) 'position' columns.
       - Simulates P&L over time assuming:
@@ -33,8 +33,7 @@ class BacktestEngine:
         self.fit_and_save = fit_and_save
         self.load_path = load_path
 
-        # Exposed for tests/reporting
-        self.position: float = 0.0  # number of shares held
+        self.position: float = 0.0  
 
     def _run_single(self, df: pd.DataFrame) -> pd.DataFrame:
         df['returns'] = (df['close'].pct_change() * df['position'].shift(1)).fillna(0.0)
@@ -55,7 +54,6 @@ class BacktestEngine:
             for symbol, subdf in df.groupby(level="symbol"):
                 single = subdf.droplevel("symbol")
                 out = self._run_single(single)
-                # Reattach symbol level
                 out["symbol"] = symbol
                 results.append(out)
         else:
@@ -77,11 +75,9 @@ class BacktestEngine:
                 else:
                     single = self.strategy.generate_signals(single).copy() ##Generate signals one by one
                 out = self._run_single(single)
-                # Reattach symbol level
                 out["symbol"] = symbol
                 results.append(out)
 
-        # concat and re-set MultiIndex(symbol, timestamp)
         final = pd.concat(results)
         final = final.set_index("symbol", append=True)
         final = final.reorder_levels(["symbol", final.index.names[0]])
@@ -120,7 +116,7 @@ class BacktestEngine:
             calmar = cagr/abs(max_drawdown) if max_drawdown<0 else np.nan
 
             cash_traded = results['equity'] * results['signal']  # Open positions in cash units
-            # Turnover as fraction of portfolio traded
+            # Turnover
             cash_bought = cash_traded.loc[cash_traded>0].sum()
             cash_sold = -cash_traded.loc[cash_traded<0].sum()
             to = min(cash_bought,cash_sold)/final_equity
@@ -140,12 +136,11 @@ class BacktestEngine:
                     total_cm += cm
 
                 TN, FP, FN, TP = total_cm[0, 0], total_cm[0, 1], total_cm[1, 0], total_cm[1, 1]
-                # Accuracy
                 accuracy = (TP + TN) / (TP + TN + FP + FN)
-                # Precision and Recall
+               
                 precision = TP / (TP + FP) if (TP + FP) > 0 else 0
                 recall    = TP / (TP + FN) if (TP + FN) > 0 else 0
-                # F1 Score
+
                 f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
                 ML_metrics = dict(zip(
                     ['F1 Score', 'Accuracy', 'Precision', 'Recall'],

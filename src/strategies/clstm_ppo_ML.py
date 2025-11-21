@@ -9,7 +9,6 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 from src.env.trading_env import TradingEnv
 
-# ──────────────────────────────────────────────────────────────────────────────
 
 class CLSTMFeatureExtractor(BaseFeaturesExtractor):
     """
@@ -39,7 +38,6 @@ class CLSTMFeatureExtractor(BaseFeaturesExtractor):
         h = self.act(self.fc2(h))
         return h
 
-# ──────────────────────────────────────────────────────────────────────────────
 def make_vec_env(env_kwargs, n_envs=1, seq_len=30):
     venv = DummyVecEnv([lambda: TradingEnv(**env_kwargs) for _ in range(n_envs)])
     return VecFrameStack(venv, n_stack=seq_len)

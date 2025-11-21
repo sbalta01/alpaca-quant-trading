@@ -11,7 +11,7 @@ from src.utils.tools import atr
 
 class HybridAdaBoostFilterStrategy(Strategy):
     """
-    Hybrid of AdaBoost MA‐predictor + two filters:
+    Hybrid of AdaBoost MA-predictor + two filters:
       1) Angle between short & long MA exceeds threshold
       2) ATR/close exceeds volatility threshold
 

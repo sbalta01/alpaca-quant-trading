@@ -15,9 +15,9 @@ from src.strategies.hybrid_adaboost_filter_ML import HybridAdaBoostFilterStrateg
 
 class RegimeSwitchingFactorStrategy(Strategy):
     """
-    Regime‐Switching Factor Investing via Hidden Markov Model:
-      - Fit a 3‐state GaussianHMM on [return, volatility] every day
-      - Label states {0,1,2} → {bear, sideways, bull}
+    Regime-Switching Factor Investing via Hidden Markov Model:
+      - Fit a 3-state GaussianHMM on [return, volatility] every day
+      - Label states {0,1,2} --> {bear, sideways, bull}
       - For each new day, detect regime by PDF thresholding
       - Dispatch to the corresponding factor model strategy to get signals
     """
@@ -56,7 +56,6 @@ class RegimeSwitchingFactorStrategy(Strategy):
         self.ret_thresh = ret_thresh
         self.random_state = random_state
 
-        # Pre‐configured value‐model (single‐symbol)
         predictor = AdaBoostStrategy(
             d=10,
             train_frac=0.7,
@@ -77,7 +76,6 @@ class RegimeSwitchingFactorStrategy(Strategy):
             atr_window=14,
             vol_threshold=0.01
         )
-        # (You can later add self.fama_french similarly)
 
         self._scaler = StandardScaler()
         self.train_frac = predictor.train_frac
@@ -95,7 +93,6 @@ class RegimeSwitchingFactorStrategy(Strategy):
 
     def _fit_hmm(self, X):
         """Fit a Gaussian HMM."""
-        # scale for numerical stability
         Xs = self._scaler.fit_transform(X)
         model = GaussianHMM(
             n_components=self.n_states,
@@ -110,7 +107,7 @@ class RegimeSwitchingFactorStrategy(Strategy):
         """
         Given a fitted HMM, sort its states by their
         expected return mean to assign labels.
-        Returns mapping {state_index → "bear"/"sideways"/"bull"}.
+        Returns mapping {state_index --> "bear"/"sideways"/"bull"}.
         """
         means = model.means_[:, 0]
         order = np.argsort(means)
@@ -144,35 +141,27 @@ class RegimeSwitchingFactorStrategy(Strategy):
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        data : MultiIndex ['symbol','timestamp'] → must include price series
+        data : MultiIndex ['symbol','timestamp'] --> must include price series
         Returns the consolidated signals from the selected factor model.
         """
         df = data.copy()
         symbols = df.index.get_level_values("symbol").unique()
-        # ——————————————————————————————————
+
         # 1) Precompute value‐model signals for every symbol
-        # ——————————————————————————————————
         def _compute_value_signals(df_sym):
-            # df_sym has DatetimeIndex and one symbol
             return self.value_model.generate_signals(df_sym)
 
-        # this returns a MultiIndex [symbol,timestamp] → signal
         value_signals = df.groupby(level="symbol") \
                             .apply(lambda grp: _compute_value_signals(grp.droplevel("symbol")))
-        # value_signals.loc[sym, t, "signal"] is the single‐symbol signal
 
-        # ——————————————————————————————————
         # 2) Prepare regime‐symbol observables
-        # ——————————————————————————————————
         df_reg = value_signals.xs(self.regime_symbol, level="symbol")
         obs = self._compute_observables(df_reg)
 
         out = pd.DataFrame(index=df.index)
         out["position"] = 0.0
 
-        # ——————————————————————————————————
         # 3) Loop over t to detect regime & pick signals
-        # ——————————————————————————————————
         for t in df_reg.loc[df_reg['test_mask']==1].index:
             window = obs.loc[:t]
             hmm    = self._fit_hmm(window.values)
@@ -184,7 +173,6 @@ class RegimeSwitchingFactorStrategy(Strategy):
                 pos_slice = value_signals.xs(t, level="timestamp")["position"]
 
             elif regime == "bear":
-                # placeholder — replace with real Fama‐French when available
                 pos_slice = value_signals.xs(t, level="timestamp")["position"]
                 # continue
             else:  # sideways
@@ -197,9 +185,7 @@ class RegimeSwitchingFactorStrategy(Strategy):
             out.loc[idx, "position"] = pos_slice.values
 
 
-        # ——————————————————————————————————
         # 4) Return
-        # ——————————————————————————————————
         df["position"] = out["position"].fillna(0.0)
         df["signal"] = df["position"].diff().fillna(0.0)
         return df

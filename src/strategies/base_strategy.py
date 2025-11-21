@@ -10,8 +10,8 @@ class Strategy(ABC):
       - A `name` attribute
       - A `generate_signals(data: pd.DataFrame) -> pd.DataFrame` method
         which returns the input DataFrame augmented with at least:
-          * 'signal'    column (1.0 = long, 0.0 = flat)
-          * 'positions' column (diff of signal: +1 buy, -1 sell)
+          - 'signal'    column (1.0 = long, 0.0 = flat)
+          - 'positions' column (diff of signal: +1 buy, -1 sell)
     """
     name: str  # e.g. "MovingAverage"
     multi_symbol = False

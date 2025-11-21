@@ -5,7 +5,7 @@ from src.strategies.base_strategy import Strategy
 
 class BuyAndHoldStrategy(Strategy):
     """
-    Control group strategy: buy all‐in at the first bar, sell everything at the last bar.
+    Control group strategy: buy all-in at the first bar, sell everything at the last bar.
     Emits:
       - signal = +1 on first timestamp
       - signal = -1 on last timestamp

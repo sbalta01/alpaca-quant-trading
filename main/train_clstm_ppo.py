@@ -13,13 +13,13 @@ def add_technicals(df: pd.DataFrame) -> pd.DataFrame:
     pieces = []
     for sym, group in df.groupby(level="symbol"):
         g = group.droplevel("symbol").copy()
-        # MACD:
+
         ema12 = g["close"].ewm(span=12).mean()
         ema26 = g["close"].ewm(span=26).mean()
         g["macd"] = ema12 - ema26
-        # RSI(14):
+
         g["rsi"]  = rsi(g["close"], 14)
-        # CCI(20):
+
         tp = (g["high"] + g["low"] + g["close"]) / 3
         ma_tp = tp.rolling(20).mean()
         md    = tp.rolling(20).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
@@ -80,7 +80,6 @@ if __name__ == "__main__":
         timeframe = timeframe_yahoo
         feed = None
     
-    # fetch price + indicators (you’ll need to join tech_cols & macro_cols beforehand)
     df = fetch_data(symbols, start, end, timeframe=timeframe)
     df = attach_factors(df, timeframe=timeframe_yahoo)
     df = add_technicals(df)

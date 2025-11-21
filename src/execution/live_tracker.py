@@ -44,7 +44,7 @@ class LivePerformanceTracker:
         max_eq = max(equities)
         # dd = (latest_eq - max_eq) / max_eq * 100
 
-        print(f"\n📈 [Live Performance]")
+        print(f"\n [Live Performance]")
         print(f"  Equity      : ${latest_eq:.2f}")
         print(f"  Return      : {ret:.2f}%")
         # print(f"  Drawdown    : {dd:.2f}%")

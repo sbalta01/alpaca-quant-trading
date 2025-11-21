@@ -1,4 +1,3 @@
-# examples/backtest_moving_avg.py
 from datetime import datetime, timedelta
 
 from alpaca.data.timeframe import TimeFrame

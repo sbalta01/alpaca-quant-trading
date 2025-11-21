@@ -117,8 +117,6 @@ def plot_candles_with_macd(df, animate = False):
         df_sym = df.xs(sym, level='symbol')
 
         # Calculate MACD lines
-        #  - 12‐period EMA, 26‐period EMA, their difference is MACD
-        #  - 9‐period EMA of MACD is the Signal line
         ema_short = df_sym['close'].ewm(span=12, adjust=False).mean()
         ema_long  = df_sym['close'].ewm(span=26, adjust=False).mean()
         macd_line = ema_short - ema_long

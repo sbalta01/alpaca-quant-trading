@@ -14,7 +14,7 @@ class RollingWindowStrategy(Strategy):
       - Features: lagged returns, momentum, volatility, RSI, MACD, OBV
       - Model: GradientBoostingClassifier inside a Pipeline
       - Rolling retrain: for each bar t in test set, train on the previous `window` bars
-      - Predict next-bar direction → generate +1/-1 signals
+      - Predict next-bar direction --> generate +1/-1 signals
     """
     name = "Rolling_Window"
 
@@ -33,7 +33,6 @@ class RollingWindowStrategy(Strategy):
         self.retrain_every = retrain_every
         self.gb_kwargs = gb_kwargs
 
-        # build pipeline
         self.pipeline = Pipeline([
             ("scaler", StandardScaler()),
             ("gb", GradientBoostingClassifier(**self.gb_kwargs))
@@ -59,13 +58,11 @@ class RollingWindowStrategy(Strategy):
         df = data.copy()
         df_feat = self._compute_features(df)
 
-        # Prepare storage
         signals = pd.Series(0.0, index=df_feat.index)
 
         last_retrain = None
         model = None
 
-        # Loop through test points: start after initial window
         for i in range(self.train_window, len(df_feat) - 1):
             if last_retrain is None or (i - last_retrain) >= self.retrain_every:
                 # retrain model on [i - train_window : i)
@@ -92,7 +89,6 @@ class RollingWindowStrategy(Strategy):
             else:
                 signals.at[ts_next] = -1.0
 
-        # assemble results
         out = df.copy()
         out["signal"] = signals.reindex(out.index).fillna(0.0)
         return out

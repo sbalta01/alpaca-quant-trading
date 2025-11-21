@@ -71,7 +71,7 @@ class MACDStrategy(Strategy):
         hist_up = df['hist_mom'] > 0
         hist_down = df['hist_mom'] < 0
 
-        # 5) Zero-line context (optional)
+        # 5) Zero-line context
         if self.zero_filter:
             above_zero = (df['macd'] > 0) & (df['signal'] > 0)
             below_zero = (df['macd'] < 0) & (df['signal'] < 0)

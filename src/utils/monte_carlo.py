@@ -114,10 +114,10 @@ class monte_carlo_portfolio_risk():
         alpha : float
             Tail probability.  e.g. alpha=0.05 means 95% VaR/CVaR.
         """
-        # 1) VaR is the α‑quantile of the loss distribution
-        var = np.quantile(final_returns, self.alpha_empirical)  # = smallest loss L such that P(Loss ≤ L) ≥ α
+        # 1) VaR is the alpha‑quantile of the loss distribution
+        var = np.quantile(final_returns, self.alpha_empirical)  # smallest loss L such that P(Loss <= L) >= alpha
 
-        # 2) CVaR is the *conditional* average of the worst-α tail
+        # 2) CVaR is the *conditional* average of the worst-alpha tail
         tail_returns = final_returns[final_returns <= var]  # those losses <= VaR (losses are negative)
         cvar = tail_returns.mean() if len(tail_returns) > 0 else var
 
@@ -151,11 +151,10 @@ class monte_carlo_portfolio_risk():
         xi, loc, beta = genpareto.fit(excess, floc=0)
 
         # 4) EVT‐VaR in **return** terms solves
-        #    P(r <= VaR_evt) = α = p_exc * GPD.cdf(u - VaR_evt)
-        #  ⇒ VaR_evt = u - (β/ξ)*((p_exc/α)**ξ - 1)
+        #    P(r <= VaR_evt) = alpha = p_exc * GPD.cdf(u - VaR_evt)
         var_evt = u - (beta/xi) * ((p_exc/self.alpha_evt)**xi - 1)
 
-        # 5) EVT‐CVaR: conditional mean of r ≤ VaR_evt
+        # 5) EVT‐CVaR: conditional mean of r <= VaR_evt
         if xi < 1:
             cvar_evt = u - (beta + (beta/xi) * ((p_exc/self.alpha_evt)**xi - 1)) / (1 - xi)
         else:
@@ -221,7 +220,7 @@ class monte_carlo_portfolio_risk():
         if self.final_price is not None:
             plt.axvline((historical_return)*100, color = 'navy',label = f"Historical return = {historical_return:.2%}")
 
-        # find bins in the worst α tail
+        # find bins in the worst alpha tail
         for rect, edge in zip(patches, bins):
             if edge <= var*100:
                 rect.set_facecolor('C3')  # tail shaded
