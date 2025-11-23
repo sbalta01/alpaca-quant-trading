@@ -2,8 +2,8 @@ name: Rebalance Portfolio Deploy
 run-name: ${{ github.actor }} is rebalancing the portfolio. 
 
 on:
-  schedule: ##Opening times US market: 13:30-20:00 UTC
-    - cron:  '30 13 9 * *' ##Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+  schedule: ## Opening times US market: 13:30-20:00 UTC
+    - cron:  '30 13 9 * *' ## Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
   workflow_dispatch:        # Allows manual trigger
 
 # Allow pushing back to the repo
@@ -25,7 +25,6 @@ jobs:
           persist-credentials: true
           fetch-depth: 1
 
-      # Optional but very helpful on space-constrained jobs. Remove only what you don't use.
       - name: Free disk space (remove unused SDKs)
         run: |
           sudo rm -rf /usr/local/lib/android || true
@@ -40,7 +39,6 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          # Use a version with widespread manylinux/macos wheels to avoid building from source
           python-version: '3.11'
 
       - name: Install dependencies (no pip cache)
