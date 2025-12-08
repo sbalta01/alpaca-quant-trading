@@ -123,7 +123,7 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
             md_file.write(report)
 
     realized_returns = total_portfolio_notional/initial_investment - 1
-    returns_report = f"Total returns from 2025-07-22: {realized_returns:0.2%}\n"
+    returns_report = f"Total returns from 2025-11-10: {realized_returns:0.2%}\n"
     print(returns_report)
     with open(md_report_file_path, "a", encoding="utf-8") as md_file:
         md_file.write(returns_report)
@@ -136,7 +136,7 @@ def main():
     start = now_utc - timedelta(days= 2* 365) 
     timeframe = "1d"
     update_portfolio_horizon = 30
-    initial_investment = 50_000 #50_000 for nas100 tickers at 2025-11-10
+    initial_investment = 50_000 #50_000 for nas100 tickers on 2025-11-10. Total in alpaca 102_311
 
     market_hols = holidays.financial_holidays("NYSE")
     today = now_utc.date()
