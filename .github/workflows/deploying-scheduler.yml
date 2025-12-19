@@ -2,8 +2,8 @@ name: Trading Deploy
 run-name: ${{ github.actor }} is deploying a quant trading algorithm.
 
 on:
-  schedule: ## Opening times US market: 13:30-20:00 UTC
-    - cron:  '30 13 * * 1-5' ## Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+  # schedule: ## Opening times US market: 13:30-20:00 UTC
+  #   - cron:  '30 13 * * 1-5' ## Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
   workflow_dispatch:        # Allows manual trigger
 
 # Allow pushing back to the repo
