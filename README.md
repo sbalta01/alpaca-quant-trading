@@ -61,7 +61,7 @@ alpaca-quant-trading/
 git clone https://github.com/sbalta01/alpaca-quant-trading.git
 cd alpaca-quant-trading
 python -m venv .venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
