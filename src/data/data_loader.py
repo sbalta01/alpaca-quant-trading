@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Union
 import yfinance as yf
-from pandas_datareader import data as pdr
+# from pandas_datareader import data as pdr
 
 import requests
 from io import StringIO
