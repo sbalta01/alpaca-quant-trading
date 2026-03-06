@@ -1,177 +1,105 @@
-# Quantitative Trading Framework
+﻿# Quantitative Trading Framework
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-A modular Python framework for **developing, backtesting, and deploying systematic trading strategies**.  
-Built for experimentation with machine learning, technical indicators, and production-ready execution pipelines.
+End-to-end quantitative trading framework for researching, backtesting, and deploying systematic strategies across equities.
 
-Supports:
+## Project Context
 
-- **LSTM-based event forecasting (Skorch / PyTorch)**
-- **XGBoost & ensemble models**
-- **Rule-based technical strategies (MACD, trend filters, RSI, ADX, SMA/EMA)**
-- **Backtesting, evaluation, and Alpaca live deployment**
+This project is built to bridge research and execution:
 
-Designed for **fast iteration, reproducibility, and live integration**.
+- Strategy R&D for rule-based, machine-learning, and reinforcement-learning models.
+- Unified backtesting with benchmark comparison.
+- Live/paper-trading execution and monthly-style portfolio rebalancing.
+- Risk-aware sizing using Monte Carlo simulation with VaR and CVaR controls.
 
----
+The stack is Python-first and integrates `alpaca-py`, `yfinance`, `scikit-learn`, `xgboost`, `torch`, and `stable-baselines3`.
 
-## Repository Structure
+## Core Strengths
 
-```
-
-alpaca-quant-trading/
-├── main/
-│   ├── backtest.py                # Full backtest engine
-│   ├── deploy.py                  # Live deployment loop
-│   ├── rebalance_portfolio.py     # Portfolio optimizer
-│   ├── visualize_stock_data.py    # OHLC + indicators plotter
-│   └── get_fundamentals.py        # API-based fundamentals
-├── src/
-│   ├── strategies/
-│   │   ├── base_strategy.py          # Abstract Strategy API
-│   │   ├── lstm_event_strategy.py    # LSTM binary classifier
-│   │   ├── lstm_regression.py        # LSTM regression forecaster
-│   │   ├── xgboost_regression.py     # Gradient boosting regression
-│   │   └── macd_strategy.py          # Rule-based MACD strategy
-│   ├── utils/
-│   │   ├── tools.py                  # Feature engineering (SMA, EMA, RSI…)
-│   │   └── metrics.py                # Sharpe, drawdown, hit-rate
-│   └── ...
-├── requirements_frozen.txt
-└── README.md
-
-````
-
----
-
-## Installation
-
-```bash
-git clone https://github.com/sbalta01/alpaca-quant-trading.git
-cd quant-trading
-
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-````
-
-### GPU Support
-
-```bash
-pip install torch
-```
-
-### For Live Trading
-
-```bash
-pip install alpaca-py
-```
-
----
-
-## Strategy Architecture
-
-All strategies inherit from:
-
-```
-src/strategies/base_strategy.py
-```
-
-Required method:
-
-```python
-generate_signals(data: pd.DataFrame) -> pd.DataFrame
-```
-
-Returned columns include:
-
-| Column              | Description           |
-| ------------------- | --------------------- |
-| `position`          | 1 = long, 0 = flat    |
-| `signal`            | entry/exit markers    |
-| `y_pred` / `y_prob` | model outputs         |
-| `features...`       | engineered indicators |
-
-Optional lifecycle methods:
-
-```python
-fit_and_save(data, path)
-load(path)
-predict_next(recent_data)
-```
-
-This enables **offline training + live inference**.
-
----
+- Modular architecture: all strategies follow a shared interface in `src/strategies/base_strategy.py`.
+- Broad strategy coverage: technical, statistical, supervised ML, deep learning, and CLSTM+PPO RL workflows.
+- Practical execution pipeline: backtest and live executors are separated but reuse common components.
+- Benchmarking discipline: strategy outputs are compared against buy-and-hold in the same period.
+- Rich performance diagnostics: Max Drawdown, CAGR, Sharpe, Sortino, Calmar, Turnover, Fitness, and trade-level metrics.
+- Portfolio risk engine: Monte Carlo optimization with empirical and EVT-style tail risk reporting.
+- Multi-market flexibility: supports US tickers and Yahoo-formatted international tickers (for example `.DE`, `.MC`).
 
 ## Backtesting
 
-Example run:
+- Final equity and total profit vs buy-and-hold benchmark.
+- Risk-adjusted metrics (Sharpe, Sortino, Calmar).
+- Drawdown and turnover-based fitness diagnostics.
+- Optional ML classification metrics when applicable (F1, Accuracy, Precision, Recall).
+
+## Repository Layout
+
+```text
+alpaca-quant-trading/
+|-- main/
+|   |-- backtest.py
+|   |-- deploy.py
+|   |-- rebalance_portfolio.py
+|   |-- run_monte_carlo.py
+|   |-- train_clstm_ppo.py
+|   `-- backtest_clstm_ppo.py
+|-- src/
+|   |-- backtesting/
+|   |-- data/
+|   |-- env/
+|   |-- execution/
+|   |-- strategies/
+|   `-- utils/
+|-- tests/
+|-- models/
+|-- requirements.txt
+`-- README.md
+```
+
+## Quick Start
+
+```bash
+git clone https://github.com/sbalta01/alpaca-quant-trading.git
+cd alpaca-quant-trading
+python -m venv .venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Set credentials in `.env` for Alpaca-enabled workflows:
+
+```env
+API_KEY=...
+API_SECRET=...
+PAPER=True
+```
+
+## Typical Workflows
+
+Run a single-strategy backtest:
 
 ```bash
 python main/backtest.py
 ```
 
-Features:
-
-* Sharpe / Sortino / MDD scoring
-* Trade logs + signal overlay plots
-* Reproducible train-val-test splits
-
-Outputs:
-
-* Equity curve
-* Performance metrics
-* Prediction diagnostics
-
----
-
-## Live Deployment
-
-Run in paper trading mode:
+Run live/paper strategy execution:
 
 ```bash
 python main/deploy.py
 ```
 
-Execution loop includes:
-
-* Live data polling
-* Incremental prediction
-* Risk-aware sizing & order routing
-
-Real-market mode:
+Run portfolio risk simulation and sizing:
 
 ```bash
-export API_KEY=...
-export API_SECRET=...
-python main/deploy.py
+python main/run_monte_carlo.py
 ```
 
----
+Run portfolio rebalance job:
 
-## Feature Engineering
+```bash
+python main/rebalance_portfolio.py
+```
 
-Key helpers (`src/utils/tools.py`):
+## Notes
 
-* SMA / EMA / WMA
-* RSI / ADX / CCI / MACD
-* Volatility measures & rolling windows
-* Event-driven features for ML
-
-Easily extended to:
-
-* Fundamentals
-* Options signals
-* Alternative data (news, sentiment)
-
----
-
-## Risk Management
-
-Built-in protections:
-
-* Stop-loss / take-profit
-* Max exposure constraints
-* Volatility-aware sizing
-* Drawdown ceilings
+- This repository is for research and engineering purposes; it is not investment advice.
+- Live trading requires careful validation, risk limits, and broker/API configuration before production use.
