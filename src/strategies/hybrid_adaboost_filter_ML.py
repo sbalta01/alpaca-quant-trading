@@ -47,7 +47,7 @@ class HybridAdaBoostFilterStrategy(Strategy):
         # 1) Get ML signals
         df = self.predictor.generate_signals(df)
         df["position_ml"] = df["position"]
-        df.drop(columns=["signal","position"])
+        df = df.drop(columns=["signal", "position"])
 
         # 2) Compute ATR volatility filter
         df["atr"]      = atr(df, self.atr_window)

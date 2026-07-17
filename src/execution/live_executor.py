@@ -27,7 +27,9 @@ md_report_file_path = "live_trading_report.md"
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
-PAPER = os.getenv("PAPER")
+# Parse as bool: os.getenv returns a string, and any non-empty string (even "False")
+# is truthy, which would silently force paper mode regardless of the setting.
+PAPER = os.getenv("PAPER", "True").strip().lower() in ("1", "true", "yes")
 
 from src.data.data_loader import fetch_alpaca_data
 from src.strategies.base_strategy import Strategy
@@ -51,6 +53,7 @@ def run_live_strategy(
     cash_per_trade: float = 1000,
     feed: str = "iex",
     market = "NYSE",
+    data_source: str = "yahoo",  # 'yahoo' or 'alpaca'
 ):
     """
     Poll market every `interval_seconds`:
@@ -97,14 +100,21 @@ def run_live_strategy(
         elif position == 0 and prev_position == 1:
             report = f"[{symbol}] SELL at {latest.name} price={latest.close:.2f}"
             print(report)
-            order = MarketOrderRequest(
-                symbol=symbol,
-                notional = cash_per_trade,
-                side=OrderSide.SELL,
-                time_in_force=TimeInForce.DAY
-            )
-            trading_client.submit_order(order)
-            tracker.record_trade(latest.name, symbol, 1, "sell", latest.close)
+            # Sell the actual held quantity, not a fixed notional: after the
+            # position has moved, a fixed-$ sell leaves residual shares (or fails).
+            if float(qty) > 0:
+                qty_available = trading_client.get_open_position(symbol).qty_available
+                order = MarketOrderRequest(
+                    symbol=symbol,
+                    qty=qty_available,
+                    side=OrderSide.SELL,
+                    time_in_force=TimeInForce.DAY
+                )
+                trading_client.submit_order(order)
+                tracker.record_trade(latest.name, symbol, 1, "sell", latest.close)
+            else:
+                report += " -- no shares held, no order submitted"
+                print(report)
             new_position = position
         else:
             new_position = prev_position
@@ -116,6 +126,18 @@ def run_live_strategy(
     while running:
         now_utc = datetime.now(timezone.utc)
         start = now_utc - timedelta(minutes=lookback_minutes)
+
+        # Check the calendar BEFORE fetching data
+        market_hols = holidays.financial_holidays(market)
+        today = now_utc.date()
+        if today.weekday() >= 5:
+            print("Today is weekend; exiting.")
+            sys.exit(0)
+        if today in market_hols:
+            print(f"Today is a holiday; exiting.")
+            sys.exit(0)
+        print("Business day; continuing with the rest of the workflow.")
+
         print(f"\n[{now_utc.strftime('%Y-%m-%d %H:%M:%S')}] Fetching bars for {symbols}")
 
         if timeframe.unit_value == TimeFrameUnit.Month:
@@ -135,9 +157,8 @@ def run_live_strategy(
             timeframe_yahoo = '1m'
 
         # 1) Fetch timeframe bars via your data loader
-        try:
+        if data_source == 'alpaca':
             from src.data.data_loader import fetch_alpaca_data as fetch_data
-            lmkdscsa
             bars = fetch_data(
                 symbol=symbols,
                 start=start,
@@ -146,28 +167,16 @@ def run_live_strategy(
                 feed = feed
             )
             print('USING ALPACA DATA')
-        except:
+        else:
             from src.data.data_loader import fetch_yahoo_data as fetch_data
-            timeframe = timeframe_yahoo
-            feed = None
             bars = fetch_data(
                 symbol=symbols,
                 start=start,
                 end=now_utc,
-                timeframe=timeframe,
-                feed = feed
+                timeframe=timeframe_yahoo,
+                feed = None
             )
             print('USING YAHOO DATA')
-
-        market_hols = holidays.financial_holidays(market)
-        today = now_utc.date()
-        if today.weekday() >= 5:
-            print("Today is weekend; exiting.")
-            sys.exit(0)
-        if today in market_hols:
-            print(f"Today is a holiday; exiting.")
-            sys.exit(0)
-        print("Business day; continuing with the rest of the workflow.")
 
         try: #Fetch strategy's horizon if it has one to hold position until horizon days have passed
             horizon = strategy.horizon

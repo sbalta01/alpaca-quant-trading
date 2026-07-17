@@ -15,7 +15,9 @@ from src.utils.monte_carlo import monte_carlo_portfolio_risk
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
-PAPER = os.getenv("PAPER")
+# Parse as bool: os.getenv returns a string, and any non-empty string (even "False")
+# is truthy, which would silently force paper mode regardless of the setting.
+PAPER = os.getenv("PAPER", "True").strip().lower() in ("1", "true", "yes")
 
 from src.data.data_loader import fetch_alpaca_data
 from src.strategies.base_strategy import Strategy
@@ -54,7 +56,13 @@ def get_target_positions(symbols: list, start: datetime, end: datetime, timefram
         optimize_position_sizing = True,
     )
     _, optimized_portfolio, empirical, evt = monte_carlo_simulator.simulate_portfolio()
-    optimized_portfolio.loc[optimized_portfolio["position"]<1/(5*n_symbols)] = 0.0 #Positions below the threshold are just removed from the portfolio
+    # Zero only the position column (not the whole row) for below-threshold weights,
+    # then RENORMALIZE so targets sum to 1 -- otherwise a slice of equity is never allocated.
+    below_thresh = optimized_portfolio["position"] < 1/(5*n_symbols)
+    optimized_portfolio.loc[below_thresh, "position"] = 0.0
+    total_weight = optimized_portfolio["position"].sum()
+    if total_weight > 0:
+        optimized_portfolio["position"] /= total_weight
     optimized_portfolio = optimized_portfolio.sort_values(by="position", axis = 0, ascending=False)
     days_report = f"Metrics predicted for the next {predict_horizon} days:\n"
     var_report = f"Portfolio VaR ({1-monte_carlo_simulator.alpha_empirical:0.0%}): {empirical[0]:.2%}\n"
@@ -85,7 +93,17 @@ def rebalance_portfolio(targets: dict, current: dict, initial_investment: float,
     total_portfolio_notional = 0
     for symbol, _ in targets.items():
         total_portfolio_notional += current.get(symbol, 0)
-    for symbol, target_proportion in targets.items():
+
+    # Submit SELLS first so the freed cash can fund the buys; within each side,
+    # largest absolute delta first.
+    def _delta(symbol, target_proportion):
+        return total_portfolio_notional * target_proportion - current.get(symbol, 0)
+    ordered_targets = sorted(
+        targets.items(),
+        key=lambda kv: (_delta(*kv) > 0, -abs(_delta(*kv)))
+    )
+
+    for symbol, target_proportion in ordered_targets:
         current_notional = current.get(symbol, 0)
         target_notional = total_portfolio_notional*target_proportion #Every time I rebalance, I always keep whatever the total equity is, and not realize any differences
         delta = target_notional - current_notional

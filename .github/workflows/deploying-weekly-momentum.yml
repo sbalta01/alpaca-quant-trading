@@ -1,0 +1,50 @@
+name: Weekly Momentum Deploy
+run-name: ${{ github.actor }} is running the weekly momentum rebalance.
+
+on:
+  schedule: ## Friday 21:30 UTC = after US close year-round; DAY orders queue for Monday open
+    - cron: '30 21 * * 5'
+  workflow_dispatch:        # Allows manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: ${{ secrets.API_KEY }}
+      API_SECRET: ${{ secrets.API_SECRET }}
+      PAPER: True   # flip to False ONLY after months of paper validation
+
+    steps:
+      - name: Checkout repo (shallow)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal dependencies
+        run: |
+          python -m pip install -U pip
+          # This strategy needs only these (no torch/sklearn) - fast CI runs
+          pip install --no-cache-dir --prefer-binary \
+            pandas numpy yfinance lxml requests alpaca-py python-dotenv holidays
+
+      - name: Run weekly momentum rebalance
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python main/deploy_weekly_momentum.py --execute
+
+      - name: Commit report
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add live_weekly_momentum.md || true
+          git commit -m "Weekly momentum rebalance report [skip ci]" || echo "nothing to commit"
+          git push || true

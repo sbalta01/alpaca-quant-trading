@@ -70,9 +70,6 @@ class RegimeSwitchingFactorStrategy(Strategy):
         )
         self.value_model = HybridAdaBoostFilterStrategy(
             predictor=predictor,
-            short_ma=9,
-            long_ma=20,
-            angle_threshold_deg=10,
             atr_window=14,
             vol_threshold=0.01
         )

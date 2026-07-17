@@ -58,19 +58,19 @@ class RollingWindowStrategy(Strategy):
         df = data.copy()
         df_feat = self._compute_features(df)
 
-        signals = pd.Series(0.0, index=df_feat.index)
+        positions = pd.Series(0.0, index=df_feat.index)
 
         last_retrain = None
         model = None
 
-        for i in range(self.train_window, len(df_feat) - 1):
+        for i in range(self.train_window, len(df_feat)):
             if last_retrain is None or (i - last_retrain) >= self.retrain_every:
-                # retrain model on [i - train_window : i)
+                # retrain model on [i - train_window : i)  -- excludes bar i, so the
+                # last training label (which needs bar i's close) is knowable at i
                 train_slice = df_feat.iloc[i - self.train_window : i]
-                X_train = train_slice.drop(columns=["open","high","low","close","volume"])
-                # label: next bar up/down
-                y_train = (train_slice["close"].shift(-1).loc[train_slice.index] 
-                           > train_slice["close"]).astype(int)
+                X_train = train_slice.drop(columns=["open","high","low","close","volume"]).iloc[:-1]
+                # label: next bar up/down (drop last row: its label needs bar i)
+                y_train = (train_slice["close"].shift(-1) > train_slice["close"]).astype(int).iloc[:-1]
                 model = Pipeline([
                     ("scaler", StandardScaler()),
                     ("gb", GradientBoostingClassifier(**self.gb_kwargs))
@@ -78,17 +78,12 @@ class RollingWindowStrategy(Strategy):
                 model.fit(X_train, y_train)
                 last_retrain = i
 
-            # predict on bar i
+            # predict on bar i -> position held from bar i (engine shifts by 1 for P&L)
             X_pred = df_feat.drop(columns=["open","high","low","close","volume"]).iloc[[i]]
             pred = model.predict(X_pred)[0]  # 1=up, 0=down
-            ts_next = df_feat.index[i + 1]
-
-            # signal at next bar
-            if pred == 1:
-                signals.at[ts_next] = 1.0
-            else:
-                signals.at[ts_next] = -1.0
+            positions.at[df_feat.index[i]] = 1.0 if pred == 1 else 0.0  # long-only
 
         out = df.copy()
-        out["signal"] = signals.reindex(out.index).fillna(0.0)
+        out["position"] = positions.reindex(out.index).fillna(0.0)
+        out["signal"] = out["position"].diff().fillna(0.0).clip(-1, 1)
         return out

@@ -105,7 +105,11 @@ class TradingEnv(gym.Env):
         if self.t >= len(self.prices):
             self.done = True
 
-        cur_val = self.cash + (self.shares * self.prices[self.t-1]).sum()
+        # Value the portfolio at the NEW bar so the reward includes price P&L.
+        # (Previously priced at prices[self.t-1] == the trade bar, which made
+        # reward == -transaction_costs on every step.)
+        price_idx = min(self.t, len(self.prices) - 1)
+        cur_val = self.cash + (self.shares * self.prices[price_idx]).sum()
         reward  = cur_val - prev_val
 
         obs = self._get_obs() if not self.done else np.zeros_like(prev_obs)

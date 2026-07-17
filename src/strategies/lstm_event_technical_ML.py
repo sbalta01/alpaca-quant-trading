@@ -584,11 +584,15 @@ class LSTMEventTechnicalStrategy(Strategy):
 
         # 1) Compute features + target (next-bar return)
         target = np.log(df['close'].shift(-self.horizon) / df['close'])
-        df['event'] = (target > self.threshold).astype(int) #This will not affect the calculation of any feature, thus no leakage
+        # NaN-aware event label: the last `horizon` rows have no knowable label and
+        # must be dropped, not silently labeled 0 (leak fix).
+        df['event'] = np.where(target.notna(), (target > self.threshold).astype(float), np.nan)
         feat = self._compute_features(df)
-        
+
         #The order (1st event, then features, then dropping na) prevents any misalignment
-        feat = feat.ffill().dropna() #Ffill so that we dont lose last rows to dropping Nas.
+        feature_cols = [c for c in feat.columns if c != 'event']
+        feat[feature_cols] = feat[feature_cols].ffill()  #Ffill features so that we dont lose last rows to dropping Nas.
+        feat = feat.dropna()
 
         # 3) Split train / test
         X = feat.drop(columns=['event']) #Remove data leakage
@@ -785,11 +789,15 @@ class LSTMEventTechnicalStrategy(Strategy):
 
         # 1) Compute features + target (next-bar return)
         target = np.log(df['close'].shift(-self.horizon) / df['close'])
-        df['event'] = (target > self.threshold).astype(int) #This will not affect the calculation of any feature, thus no leakage
+        # NaN-aware event label: the last `horizon` rows have no knowable label and
+        # must be dropped from training, not silently labeled 0 (leak fix).
+        df['event'] = np.where(target.notna(), (target > self.threshold).astype(float), np.nan)
         feat = self._compute_features(df)
-        
+
         #The order (1st event, then features, then dropping na) prevents any misalignment
-        feat = feat.ffill().dropna() #Ffill so that we dont lose last rows to dropping Nas.
+        feature_cols = [c for c in feat.columns if c != 'event']
+        feat[feature_cols] = feat[feature_cols].ffill()  #Ffill features so that we dont lose last rows to dropping Nas.
+        feat = feat.dropna()
 
         # 3) Split train / test
         X_full = feat.drop(columns=['event']) #Remove data leakage

@@ -26,7 +26,11 @@ class MomentumRankingAdaBoostStrategy(Strategy):
         feat["target"] = np.sign(
             feat[f"MA{self.predictor.d}"].shift(-1) - feat[f"MA{self.predictor.d}"]
         )
-        feat = feat.dropna(subset=["target"])
+        # Drop rows with NaN features (rolling warm-up) as well as NaN target:
+        # StandardScaler/RFECV reject NaNs.
+        feature_cols = [c for c in feat.columns if c != "target"]
+        feat[feature_cols] = feat[feature_cols].ffill()
+        feat = feat.dropna()
 
         split = int(len(feat) * self.predictor.train_frac)
         train = feat.iloc[:split]

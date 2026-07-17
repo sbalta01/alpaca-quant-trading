@@ -40,7 +40,7 @@ def fetch_sp500_symbols():
 
 
 def fetch_nasdaq_100_symbols():
-    url = "https://en.wikipedia.org/wiki/NASDAQ-100"
+    url = "https://en.wikipedia.org/wiki/List_of_NASDAQ-100_companies"
     headers = {"User-Agent": "Mozilla/5.0"} 
     response = requests.get(url, headers=headers)
     response.raise_for_status() 

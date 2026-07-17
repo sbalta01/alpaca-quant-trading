@@ -144,8 +144,7 @@ class monte_carlo_portfolio_risk():
 
         if k < 5:
             print("Not enough tail points to fit GPD - lower threshold_q. Returning NaN")
-            return {"VaR_evt": np.nan,
-                "CVaR_evt": np.nan,}
+            return np.nan, np.nan  # same (var, cvar) tuple shape as the normal path
 
         # 3) Fit GPD to those excesses
         xi, loc, beta = genpareto.fit(excess, floc=0)

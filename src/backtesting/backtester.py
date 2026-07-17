@@ -14,7 +14,7 @@ class BacktestEngine:
       - Calls strategy.generate_signals(data) to get 'signal' & (new) 'position' columns.
       - Simulates P&L over time assuming:
           * Full allocation on each trade (all-in / all-out)
-          * Zero transaction costs
+          * Proportional transaction costs of `cost_bps` per side (on each position change)
           * No leverage
       - Computes basic performance metrics.
     """
@@ -25,18 +25,24 @@ class BacktestEngine:
         data: pd.DataFrame,
         initial_cash_per_stock: float = 10_000.0,
         fit_and_save: bool = False,
-        load_path: str = None
+        load_path: str = None,
+        cost_bps: float = 10.0,
     ):
         self.strategy = strategy
         self.data = data
         self.initial_cash_per_stock = initial_cash_per_stock
         self.fit_and_save = fit_and_save
         self.load_path = load_path
+        self.cost_bps = cost_bps
 
-        self.position: float = 0.0  
+        self.position: float = 0.0
 
     def _run_single(self, df: pd.DataFrame) -> pd.DataFrame:
-        df['returns'] = (df['close'].pct_change() * df['position'].shift(1)).fillna(0.0)
+        gross = (df['close'].pct_change() * df['position'].shift(1)).fillna(0.0)
+        # Cost charged on every position change (entry and exit), proportional to traded fraction
+        trades = df['position'].diff().abs()
+        trades.iloc[0] = abs(df['position'].iloc[0])  # first-bar entry also costs
+        df['returns'] = gross - trades * self.cost_bps / 1e4
         df['cum_returns'] = ((1 + df['returns']).cumprod() - 1).fillna(0.0)
         df['equity'] = self.initial_cash_per_stock * (1 + df['cum_returns'])
         return df
@@ -90,8 +96,16 @@ class BacktestEngine:
         final_equity = total_equity.iloc[-1]
         total_returns = results['returns'].groupby(level="timestamp").mean()
         total_cum_returns = results['cum_returns'].groupby(level="timestamp").mean() #Mean assumes same cash_per_trade for each asset
-        final_cum_returns = total_cum_returns.iloc[-1] 
+        final_cum_returns = total_cum_returns.iloc[-1]
         profit = final_equity - initial_cash
+
+        # Restrict risk metrics to the out-of-sample (test) window when available.
+        # ML strategies emit position=0 during the train fraction; including those
+        # zero-return days deflates Sharpe/Sortino by ~sqrt(test_frac).
+        if 'test_mask' in results.columns:
+            mask_ts = results['test_mask'].groupby(level="timestamp").max()
+            if mask_ts.sum() > 0:
+                total_returns = total_returns.loc[mask_ts[mask_ts == 1].index]
 
         def metrics(total_returns): #All metrics are calculated in a Day TimeFrame
             # Annualization factor

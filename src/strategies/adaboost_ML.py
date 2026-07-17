@@ -32,7 +32,9 @@ class AdaBoostStrategy(Strategy):
         param_grid: Dict[str, Any] = None,
         random_state: int = 42,
         ratio_outliers: float = np.inf,
-        n_iter_search: int = 50
+        n_iter_search: int = 50,
+        prob_positive_threshold: float = 0.7,
+        adjust_threshold: bool = False,
     ):
         """
         Parameters
@@ -59,6 +61,8 @@ class AdaBoostStrategy(Strategy):
         self.random_state = random_state
         self.ratio_outliers = ratio_outliers
         self.n_iter_search = n_iter_search
+        self.prob_positive_threshold = prob_positive_threshold
+        self.adjust_threshold = adjust_threshold
 
         self.model = AdaBoostClassifier(
             random_state=self.random_state
@@ -128,9 +132,14 @@ class AdaBoostStrategy(Strategy):
         df = data.copy()
         # 1) Build features & target
         feat = self._compute_features(df)
-        feat['target'] = (feat[f'MA{self.d}'].shift(-1) > feat[f'MA{self.d}'])
-        feat['target'] = feat['target'].astype(int)
-        feat = feat.ffill().dropna()  #Ffill so that we dont lose last rows to dropping Nas.
+        # NaN-aware target: last row has no lookahead label; mark NaN so it is
+        # dropped from training instead of being fabricated (leak fix).
+        ma_next = feat[f'MA{self.d}'].shift(-1)
+        feat['target'] = np.where(ma_next.notna(), (ma_next > feat[f'MA{self.d}']).astype(float), np.nan)
+        # Ffill features only, so the target NaNs still drop their rows.
+        feature_cols = [c for c in feat.columns if c != 'target']
+        feat[feature_cols] = feat[feature_cols].ffill()
+        feat = feat.dropna()
 
         # 2) Remove outliers
         feat = remove_outliers(feat, ratio_outliers=self.ratio_outliers)
@@ -192,9 +201,7 @@ class AdaBoostStrategy(Strategy):
         test_mask = pd.Series(0.0, index=feat.index)
         idxs = list(X_test.index)
 
-        self.prob_positive_threshold = 0.7
         # y_prob = pd.Series(y_prob).rolling(3).mean() #Smooth the probabilities to avoid single-day flops
-        self.adjust_threshold = False
         adjusted_prob_threshold = threshold_adjust(feat['close_inc'], horizon = self.d, base_threshold = 0.5, max_shift=0.2) if self.adjust_threshold else pd.Series(self.prob_positive_threshold, index = idxs)
         position = 0
 

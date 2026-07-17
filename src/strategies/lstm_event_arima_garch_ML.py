@@ -368,7 +368,9 @@ class LSTMEventStrategy(Strategy):
         df = data.copy()
 
         target = np.log(df['close'].shift(-self.horizon) / df['close'])
-        df['event'] = (target > self.threshold).astype(int) #This first so that X and y are aligned when dropping columns
+        # NaN-aware event label: the last `horizon` rows have no knowable label and must
+        # be dropped downstream, not silently labeled 0 (leak fix).
+        df['event'] = np.where(target.notna(), (target > self.threshold).astype(float), np.nan) #This first so that X and y are aligned when dropping columns
 
 
         split_index = int(len(df) * self.train_frac)

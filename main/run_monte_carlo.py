@@ -42,28 +42,26 @@ elif timeframe.unit_value == TimeFrameUnit.Hour:
 elif timeframe.unit_value == TimeFrameUnit.Minute:
     print('Timeframe set to Minute')
     timeframe_yahoo = '1m'
-try:
+data_source = 'yahoo'  # 'yahoo' or 'alpaca'
+if data_source == 'alpaca':
     from src.data.data_loader import fetch_alpaca_data as fetch_data
-    raise Exception("Chose not to import from alpaca")
-    df = fetch_data(
-    symbol=symbols,
-    start=start,
-    end=end,
-    timeframe=timeframe,
-    feed = feed
-    )
     print('USING ALPACA DATA')
-except:
-    from src.data.data_loader import fetch_yahoo_data as fetch_data
-    print('USING YAHOO DATA')
-    timeframe = timeframe_yahoo
-    feed = None
     df = fetch_data(
         symbol=symbols,
         start=start,
         end=end,
         timeframe=timeframe,
         feed = feed
+        )
+else:
+    from src.data.data_loader import fetch_yahoo_data as fetch_data
+    print('USING YAHOO DATA')
+    df = fetch_data(
+        symbol=symbols,
+        start=start,
+        end=end,
+        timeframe=timeframe_yahoo,
+        feed = None
         )
     
 

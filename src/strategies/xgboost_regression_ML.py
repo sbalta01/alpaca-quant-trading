@@ -248,7 +248,11 @@ class XGBoostRegressionStrategy(Strategy):
         # 1) Compute features + target (next-bar return)
         df['target'] = np.log(df['close'].shift(-self.horizon)/df['close'])
         feat = self._compute_features(df)
-        feat = feat.ffill().dropna()  #Ffill so that we dont lose last rows to dropping Nas.
+        # Ffill features only: the last `horizon` rows have no knowable target and
+        # must be dropped from train/test, not forward-filled (leak fix).
+        feature_cols = [c for c in feat.columns if c != 'target']
+        feat[feature_cols] = feat[feature_cols].ffill()
+        feat = feat.dropna()
 
         # 3) Split train / test
         # X = feat.drop(columns=['target','close','high','low','open'])

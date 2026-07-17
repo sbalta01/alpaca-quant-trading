@@ -5,7 +5,6 @@ from typing import Union, List
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
 from src.backtesting.backtester import BacktestEngine
 from src.data.data_loader import attach_factors
@@ -23,6 +22,8 @@ def run_backtest_strategy(
     feed: str = 'iex',
     fit_and_save: bool = False,
     load_path: str = None,
+    cost_bps: float = 10.0,
+    data_source: str = 'yahoo',  # 'yahoo' or 'alpaca'
 ) -> pd.DataFrame:
     """
     Run a backtest of `strategy` on `symbols` between `start` and `end`.
@@ -57,62 +58,39 @@ def run_backtest_strategy(
     elif timeframe.unit_value == TimeFrameUnit.Minute:
         print('Timeframe set to Minute')
         timeframe_yahoo = '1m'
-    try:
+    if data_source == 'alpaca':
         from src.data.data_loader import fetch_alpaca_data as fetch_data
-        raise ValueError("Chose not to use Alpaca data")
-        df = fetch_data(
-        symbol=symbols,
-        start=start,
-        end=end,
-        timeframe=timeframe,
-        feed = feed
-        )
         print('USING ALPACA DATA')
-    except:
+    else:
         from src.data.data_loader import fetch_yahoo_data as fetch_data
         print('USING YAHOO DATA')
         timeframe = timeframe_yahoo
         feed = None
 
-    delta = end - start
-    try:
-        train_frac = strategy.train_frac
-
-        df = fetch_data(
+    df = fetch_data(
         symbol=symbols,
         start=start,
         end=end,
         timeframe=timeframe,
-        feed = feed
-        )
-        df_single = fetch_data(
-        symbol=[symbols[0]],
-        start=start,
-        end=end,
-        timeframe=timeframe,
-        feed = feed
-        )
-        _, df_control_single, _, _ = train_test_split(
-            df_single, df_single, train_size=train_frac, shuffle=False
-        )
-        start_control = list(df_control_single.droplevel('symbol').index)[0]
+        feed=feed
+    )
+
+    if hasattr(strategy, 'train_frac'):
+        # Benchmark only over the strategy's out-of-sample (test) window
+        first_sym = df.index.get_level_values('symbol')[0]
+        ts = df.xs(first_sym, level='symbol').index
+        split = int(len(ts) * strategy.train_frac)
+        start_control = ts[split]
         delta = end.date() - start_control.date()
         df_control = fetch_data(
-        symbol=symbols,
-        start=start_control,
-        end=end,
-        timeframe=timeframe,
-        feed = feed
+            symbol=symbols,
+            start=start_control,
+            end=end,
+            timeframe=timeframe,
+            feed=feed
         )
-
-    except:
-        df = fetch_data(
-        symbol=symbols,
-        start=start,
-        end=end,
-        timeframe=timeframe,
-        feed = feed
-        )
+    else:
+        delta = end - start
         df_control = df.copy()
         start_control = start
     num_years = delta.days / 365
@@ -124,11 +102,12 @@ def run_backtest_strategy(
     print('Strategy:', strategy.name)
 
     # 2) Initialize and run backtest
-    engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock, fit_and_save = fit_and_save, load_path = load_path)
+    print(f"Transaction cost model: {cost_bps} bps per side")
+    engine = BacktestEngine(strategy=strategy, data=df, initial_cash_per_stock=initial_cash_per_stock, fit_and_save = fit_and_save, load_path = load_path, cost_bps=cost_bps)
     results = engine.run()
 
 
-    engine_control = BacktestEngine(strategy=BuyAndHoldStrategy(), data=df_control, initial_cash_per_stock=initial_cash_per_stock, fit_and_save = False, load_path = None)
+    engine_control = BacktestEngine(strategy=BuyAndHoldStrategy(), data=df_control, initial_cash_per_stock=initial_cash_per_stock, fit_and_save = False, load_path = None, cost_bps=cost_bps)
     results_control = engine_control.run()
     
     # 3) Compute performance
