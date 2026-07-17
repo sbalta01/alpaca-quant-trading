@@ -2,8 +2,8 @@ name: Rebalance Portfolio Deploy
 run-name: ${{ github.actor }} is rebalancing the portfolio. 
 
 on:
-  schedule: ## Opening times US market: 13:30-20:00 UTC
-    - cron:  '30 13 9 * *' ## Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
+  # schedule: ## Opening times US market: 13:30-20:00 UTC
+  #   - cron:  '30 13 9 * *' ## Minute, hour (UTC), day, month, day of the week (0-6)(Sunday to Saturday)
   workflow_dispatch:        # Allows manual trigger
 
 # Allow pushing back to the repo
