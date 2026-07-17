@@ -35,6 +35,13 @@ python main/backtest_weekly_momentum.py --tickers AAPL MSFT NVDA AMZN GOOG META 
 
 It prints: metrics table (Strategy vs equal-weight universe vs QQQ vs SPY over the identical window), yearly returns, annualized turnover with its cost implication, and **the exact portfolio it would buy today**. The whole history is walk-forward (signals never see the future), but remember the universe is today's index membership, so absolute numbers are survivorship-flattered — the fairest read is Strategy vs the equal-weight benchmark of the *same* universe.
 
+**Holistic weekly method (layers 2-4 on top of the momentum core):** compares the deployed method against variants adding short-term reversal, a pooled cross-sectional ML ranker, and an HMM+turbulence regime gate — each admitted only if it improves out-of-sample results:
+
+```bash
+python main/backtest_weekly_holistic.py                    # NASDAQ-100, 10y, zero cost
+python main/backtest_weekly_holistic.py --cost-bps 10      # realistic-cost variant
+```
+
 **Single-name strategies (research stack):** edit the symbol/strategy block in `main/backtest.py`, then:
 
 ```bash
@@ -43,7 +50,15 @@ python main/backtest.py
 
 The engine now charges `cost_bps=10` per side by default and computes Sharpe/Sortino on the out-of-sample window only. Pass `cost_bps=0` to `run_backtest_strategy(...)` if you want the old frictionless numbers.
 
-**Regression tests** (no network needed): `python tests/test_engine_synthetic.py`
+**Walk-forward re-evaluation (research stack):** judges a strategy only on stitched out-of-sample segments, refit every quarter with a purge gap — the honest way to read any ML result here:
+
+```bash
+python main/walkforward_eval.py --strategy macd --symbols AAPL MSFT SPY
+python main/walkforward_eval.py --strategy xgboost --symbols AAPL --fast   # no Optuna/RFECV
+python main/walkforward_eval.py --strategy xgboost --symbols AAPL          # full research config (slow)
+```
+
+**Regression tests** (no network needed): `python tests/test_engine_synthetic.py`, `python tests/test_walkforward_synthetic.py`, `python tests/test_weekly_holistic_synthetic.py`
 
 ## 2. Live / paper trading — manual first
 
@@ -53,6 +68,8 @@ Always dry-run first. It prints the target portfolio and every order it *would* 
 python main/deploy_weekly_momentum.py            # dry run
 python main/deploy_weekly_momentum.py --execute  # submits orders (paper while PAPER=True)
 ```
+
+`--holistic` switches to the full six-layer method (reversal + ML ranker + HMM/turbulence gate). As of the 2026-07 comparison the extra layers cut volatility and drawdown but cost too much return and turnover to be admitted (Sharpe 1.07 vs 1.23 at 10 bps) - keep the default. Re-run `main/backtest_weekly_holistic.py` before ever flipping it, and paper-trade the switch like any new strategy.
 
 Orders are market DAY orders: run after the close and they queue for the next open. Sells are submitted before buys; dropped names are liquidated by share quantity; trades under 0.5% of equity are skipped to control churn. Each run appends to `live_weekly_momentum.md`.
 

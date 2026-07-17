@@ -70,6 +70,11 @@ def main():
     p.add_argument("--weight-cap", type=float, default=0.20)
     p.add_argument("--low-exposure", type=float, default=0.4)
     p.add_argument("--tickers", nargs="+", default=None)
+    p.add_argument("--holistic", action="store_true",
+                   help="Use the full holistic method (layers 2-4: reversal + ML "
+                        "ranker + HMM gate). Needs xgboost/hmmlearn and ~3y more "
+                        "history; only switch after it beats the default method "
+                        "out-of-sample (main/backtest_weekly_holistic.py).")
     args = p.parse_args()
 
     now = datetime.now(timezone.utc)
@@ -83,14 +88,21 @@ def main():
     else:
         from src.data.data_loader import fetch_nasdaq_100_symbols
         universe = fetch_nasdaq_100_symbols()
-    start = now - timedelta(days=600)  # enough for 252+21 momentum + 200dma
+    # 600d covers 252+21 momentum + 200dma; the holistic ML layer needs ~3.5y
+    # of weekly cross-sections on top of the ~1y feature warm-up.
+    start = now - timedelta(days=1700 if args.holistic else 600)
     prices = fetch_close_matrix(sorted(set(universe)), start, now)
     bench = fetch_close_matrix(["SPY"], start, now)
     prices = prices.reindex(bench.index).ffill()
 
     # 2) Target weights as of the latest close
-    w = compute_target_weights(prices, bench["SPY"], top_k=args.top_k,
-                               weight_cap=args.weight_cap, low_exposure=args.low_exposure)
+    if args.holistic:
+        from src.strategies.weekly_holistic import compute_holistic_target_weights
+        w = compute_holistic_target_weights(prices, bench["SPY"], top_k=args.top_k,
+                                            weight_cap=args.weight_cap)
+    else:
+        w = compute_target_weights(prices, bench["SPY"], top_k=args.top_k,
+                                   weight_cap=args.weight_cap, low_exposure=args.low_exposure)
     print(f"Signal date: {prices.index[-1].date()} | gross exposure {w.sum():.2f}")
     print((w * 100).round(2).to_string(), f"\nCash: {(1 - w.sum()) * 100:.2f}%\n")
 
