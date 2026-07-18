@@ -17,10 +17,15 @@ This module is deliberately independent of the Strategy/BacktestEngine stack:
 weights are cross-sectional portfolio weights (not per-symbol 0/1 positions),
 so it comes with its own walk-forward backtester (main/backtest_weekly_momentum.py).
 """
-from typing import Iterable, Tuple
+from typing import Callable, Iterable, Tuple
 
 import numpy as np
 import pandas as pd
+
+
+def default_selector(scores: pd.Series, top_k: int) -> pd.Index:
+    """Pick the top_k names by score. The default selection rule."""
+    return scores.nlargest(top_k).index
 
 
 def momentum_scores(
@@ -95,15 +100,20 @@ def compute_target_weights(
     weight_cap: float = 0.20,
     ma_window: int = 200,
     low_exposure: float = 0.4,
+    selector: Callable[[pd.Series, int], pd.Index] = None,
 ) -> pd.Series:
     """
     Target portfolio weights as of prices.index[-1] (weights sum to <= 1;
     the remainder is cash). Uses only data up to and including that date.
+
+    `selector(scores, top_k) -> Index` chooses which names to hold; defaults to
+    top_k by score. Swapping it is how the random-k null test and rank
+    buffering plug in without forking this function.
     """
     score_today = momentum_scores(prices, lookbacks, skip).iloc[-1].dropna()
     if score_today.empty:
         return pd.Series(dtype=float)
-    members = score_today.nlargest(top_k).index
+    members = (selector or default_selector)(score_today, top_k)
     w = inverse_vol_weights(prices, members, vol_window, weight_cap)
     expo = regime_exposure(benchmark, ma_window, low_exposure)
     return (w * expo).sort_values(ascending=False)
@@ -113,6 +123,62 @@ def weekly_rebalance_dates(index: pd.DatetimeIndex) -> pd.DatetimeIndex:
     """Last trading day of each ISO week present in `index`."""
     s = pd.Series(index, index=index)
     iso = index.isocalendar()
+    last = s.groupby([iso.year.values, iso.week.values]).last()
+    return pd.DatetimeIndex(sorted(last.values))
+
+
+class BufferedSelector:
+    """
+    Rank buffering: hold an incumbent until it falls out of the top
+    `buffer_mult * top_k`, instead of dropping it the moment it leaves the
+    top_k. Weekly re-ranking otherwise churns names that merely slipped from
+    rank 10 to 11, which is pure cost for no signal.
+
+    Stateful, so run_walkforward takes a FACTORY - two runs must not share one
+    instance or a parameter sweep would contaminate itself.
+
+    buffer_mult=1.0 reduces exactly to `default_selector`.
+    """
+
+    def __init__(self, buffer_mult: float = 1.5):
+        if buffer_mult < 1.0:
+            raise ValueError("buffer_mult must be >= 1.0")
+        self.buffer_mult = buffer_mult
+        self.held: list = []
+
+    def __call__(self, scores: pd.Series, top_k: int) -> pd.Index:
+        k = min(top_k, len(scores))
+        ranked = scores.sort_values(ascending=False)
+        keep_depth = int(np.ceil(self.buffer_mult * top_k))
+        eligible = set(ranked.index[:keep_depth])
+
+        # Incumbents that still exist AND are still within the buffer zone.
+        # The `in scores.index` check matters: a delisted holding must not raise.
+        survivors = [h for h in self.held if h in eligible]
+        survivors = survivors[:k]
+
+        if len(survivors) < k:
+            fill = [t for t in ranked.index if t not in survivors]
+            survivors += fill[:k - len(survivors)]
+
+        # Re-order by score so the output is deterministic regardless of history.
+        self.held = list(ranked.index[ranked.index.isin(survivors)])[:k]
+        return pd.Index(self.held)
+
+
+def weekly_rebalance_dates_on(index: pd.DatetimeIndex, weekday: int = 4) -> pd.DatetimeIndex:
+    """
+    Last trading day of each ISO week at or before `weekday` (Mon=0 ... Fri=4).
+
+    Sibling of weekly_rebalance_dates (which is Friday-close by construction);
+    used by the rebalance-weekday robustness sweep. A genuine edge should not
+    depend on which day of the week it is rebalanced.
+    """
+    sub = index[index.dayofweek <= weekday]
+    if len(sub) == 0:
+        return pd.DatetimeIndex([])
+    s = pd.Series(sub, index=sub)
+    iso = sub.isocalendar()
     last = s.groupby([iso.year.values, iso.week.values]).last()
     return pd.DatetimeIndex(sorted(last.values))
 
@@ -129,6 +195,9 @@ def run_walkforward(
     low_exposure: float = 0.4,
     cost_bps: float = 0.0,
     warmup: int = None,
+    selector_factory: Callable[[], Callable[[pd.Series, int], pd.Index]] = None,
+    rebal_dates: pd.DatetimeIndex = None,
+    min_trade_fraction: float = 0.0,
 ) -> dict:
     """
     Walk-forward weekly backtest.
@@ -138,6 +207,19 @@ def run_walkforward(
     cost_bps is charged on turnover (sum |dw|) at each rebalance; the caller
     can set 0 to assume free trading.
 
+    `selector_factory` is called ONCE per run to build the selection rule. It
+    is a factory rather than an instance because stateful selectors (e.g.
+    BufferedSelector) must not carry state across runs in a parameter sweep.
+
+    `warmup` should be passed explicitly when comparing configs with different
+    lookbacks, so every config is evaluated over an identical window.
+    `rebal_dates` overrides the default Friday-close schedule.
+
+    `min_trade_fraction`: skip per-name weight changes smaller than this (the
+    live executor already skips trades under 0.5% of equity, so the default
+    0.0 backtest OVERSTATES turnover relative to what actually trades; pass
+    0.005 to mirror deploy_weekly_momentum.MIN_TRADE_FRACTION).
+
     Returns dict with 'daily_returns', 'weights' (per rebalance date),
     'turnover' (per rebalance date), 'exposure' (per rebalance date).
     """
@@ -145,8 +227,17 @@ def run_walkforward(
     if warmup >= len(prices.index):
         raise ValueError(
             f"Not enough history: need > {warmup} rows for warm-up, got {len(prices.index)}")
-    daily_rets = prices.pct_change().fillna(0.0)
-    rebal_dates = [d for d in weekly_rebalance_dates(prices.index) if d >= prices.index[warmup]]
+    selector = (selector_factory or (lambda: default_selector))()
+    # `alive` marks names with a real print. A held name that goes dead is
+    # liquidated to CASH below rather than being left to "earn" 0% forever
+    # (which is what pct_change().fillna(0) would silently imply).
+    alive = prices.notna()
+    # fill_method=None: never pad across a gap. Padding would manufacture a 0%
+    # return for a dead name, which is precisely the zombie behavior `alive`
+    # exists to prevent.
+    daily_rets = prices.pct_change(fill_method=None).fillna(0.0)
+    schedule = weekly_rebalance_dates(prices.index) if rebal_dates is None else rebal_dates
+    rebal_dates = [d for d in schedule if d >= prices.index[warmup]]
 
     w_current = pd.Series(dtype=float)
     port_ret = pd.Series(0.0, index=prices.index)
@@ -159,6 +250,11 @@ def run_walkforward(
         if pending_weights is not None:
             w_current = pending_weights
             pending_weights = None
+        # drop any holding that has gone dead; its weight becomes cash
+        if len(w_current) > 0:
+            live = alive.loc[date, w_current.index]
+            if not live.all():
+                w_current = w_current[live.values]
         # accrue today's return with weights held today
         if len(w_current) > 0:
             port_ret.loc[date] = float((daily_rets.loc[date, w_current.index] * w_current).sum())
@@ -168,7 +264,17 @@ def run_walkforward(
             w_new = compute_target_weights(
                 hist, benchmark.loc[:date], top_k, lookbacks, skip,
                 vol_window, weight_cap, ma_window, low_exposure,
+                selector=selector,
             )
+            # No-trade band: leave sub-threshold deltas at their current weight,
+            # exactly as the live executor does. Default 0.0 = trade everything.
+            if min_trade_fraction > 0 and len(w_current) > 0:
+                names = w_new.index.union(w_current.index)
+                tgt = w_new.reindex(names, fill_value=0.0)
+                cur = w_current.reindex(names, fill_value=0.0)
+                small = (tgt - cur).abs() < min_trade_fraction
+                tgt[small] = cur[small]
+                w_new = tgt[tgt > 0].sort_values(ascending=False)
             all_names = w_new.index.union(w_current.index)
             turnover = float(
                 (w_new.reindex(all_names, fill_value=0.0)

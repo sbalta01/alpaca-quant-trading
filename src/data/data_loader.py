@@ -40,19 +40,10 @@ def fetch_sp500_symbols():
 
 
 def fetch_nasdaq_100_symbols():
-    url = "https://en.wikipedia.org/wiki/List_of_NASDAQ-100_companies"
-    headers = {"User-Agent": "Mozilla/5.0"} 
-    response = requests.get(url, headers=headers)
-    response.raise_for_status() 
-    
-    html = StringIO(response.text)
-    tables = pd.read_html(html)
-    
-    df = next(tbl for tbl in tables if "Ticker" in tbl.columns)
-    
-    symbols = df['Ticker'].tolist()
-    symbols = [s.replace('.', '-') for s in symbols]
-    return symbols
+    # Delegates to the hardened fetcher (retry + validation + committed-snapshot
+    # fallback) so a Wikipedia hiccup or bad parse cannot fail the live run.
+    from src.data.universe import fetch_nasdaq_100_symbols as _fetch
+    return _fetch()
 
 def load_csv_data(filepath: str) -> pd.DataFrame:
     df = pd.read_csv(filepath, parse_dates=['date'])

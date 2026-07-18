@@ -67,6 +67,11 @@ def main():
     p.add_argument("--low-exposure", type=float, default=0.4,
                    help="Gross exposure when SPY < 200dma.")
     p.add_argument("--no-regime-gate", action="store_true")
+    p.add_argument("--buffer-mult", type=float, default=1.5,
+                   help="Rank-buffer width (matches the live default). "
+                        "1.0 = no buffering (pre-2026-07 behavior).")
+    p.add_argument("--min-trade-fraction", type=float, default=0.005,
+                   help="No-trade band, mirroring the live executor. 0 disables.")
     args = p.parse_args()
 
     if args.tickers:
@@ -75,7 +80,8 @@ def main():
         from src.data.data_loader import fetch_nasdaq_100_symbols
         universe = fetch_nasdaq_100_symbols()
     print(f"Universe: {len(universe)} tickers | top_k={args.top_k} | "
-          f"cost={args.cost_bps} bps | regime gate={'off' if args.no_regime_gate else 'on'}")
+          f"cost={args.cost_bps} bps | regime gate={'off' if args.no_regime_gate else 'on'} | "
+          f"buffer={args.buffer_mult}x | band={args.min_trade_fraction:.3f}")
 
     end = datetime.now()
     start = end - timedelta(days=int(args.years * 365.25) + 400)  # +400d for warm-up
@@ -83,15 +89,22 @@ def main():
     prices = fetch_close_matrix(sorted(set(universe)), start, end)
     bench = fetch_close_matrix(["SPY", "QQQ"], start, end)
     # keep tickers with enough history to ever be scored
-    prices = prices.loc[:, prices.notna().sum() > 300]
-    prices = prices.reindex(bench.index).ffill()
+    # No global "has enough history" filter: that used whole-sample data
+    # availability to decide inclusion, which silently erased recent index
+    # additions. Per-date eligibility is already handled by momentum_scores
+    # returning NaN until the lookback is computable.
+    # Bounded ffill so a dead ticker drops out instead of holding a flat price.
+    prices = prices.reindex(bench.index).ffill(limit=5)
     print(f"Got {prices.shape[1]} usable tickers, {prices.shape[0]} days "
           f"({prices.index[0].date()} -> {prices.index[-1].date()})")
 
     low_expo = 1.0 if args.no_regime_gate else args.low_exposure
+    from src.strategies.weekly_momentum import BufferedSelector
     res = run_walkforward(
         prices, bench["SPY"], top_k=args.top_k, weight_cap=args.weight_cap,
         low_exposure=low_expo, cost_bps=args.cost_bps,
+        selector_factory=lambda: BufferedSelector(args.buffer_mult),
+        min_trade_fraction=args.min_trade_fraction,
     )
     r = res["daily_returns"]
     r = r.loc[r.ne(0).idxmax():]  # trim pre-warmup zeros
@@ -124,9 +137,13 @@ def main():
     print("\nYearly returns:")
     print(yr.to_string())
 
-    # What you would hold if deployed today
+    # What you would hold if deployed today (buffered against the walk-forward's
+    # final book, the same way live buffers against actual account positions)
+    sel_today = BufferedSelector(args.buffer_mult)
+    sel_today.held = list(res["weights"][max(res["weights"])].index)
     w_today = compute_target_weights(prices, bench["SPY"], top_k=args.top_k,
-                                     weight_cap=args.weight_cap, low_exposure=low_expo)
+                                     weight_cap=args.weight_cap, low_exposure=low_expo,
+                                     selector=sel_today)
     print(f"\n=== Target portfolio if deployed today ({prices.index[-1].date()}) ===")
     print((w_today * 100).round(2).to_string())
     print(f"Cash: {(1 - w_today.sum()) * 100:.2f}%")

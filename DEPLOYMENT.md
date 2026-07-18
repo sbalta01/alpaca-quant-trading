@@ -33,7 +33,16 @@ python main/backtest_weekly_momentum.py --no-regime-gate   # ablation: is the ga
 python main/backtest_weekly_momentum.py --tickers AAPL MSFT NVDA AMZN GOOG META AVGO ...
 ```
 
-It prints: metrics table (Strategy vs equal-weight universe vs QQQ vs SPY over the identical window), yearly returns, annualized turnover with its cost implication, and **the exact portfolio it would buy today**. The whole history is walk-forward (signals never see the future), but remember the universe is today's index membership, so absolute numbers are survivorship-flattered — the fairest read is Strategy vs the equal-weight benchmark of the *same* universe.
+It prints: metrics table (Strategy vs equal-weight universe vs QQQ vs SPY over the identical window), yearly returns, annualized turnover with its cost implication, and **the exact portfolio it would buy today**. Defaults now match live: rank buffering (`--buffer-mult 1.5`, hold a name until it exits the top 15) and the live 0.5% no-trade band — together they halve turnover (19x -> ~10x/yr) at unchanged Sharpe. `--buffer-mult 1.0 --min-trade-fraction 0` recovers the old behavior.
+
+**Diagnostics** (run these before trusting any config change):
+
+```bash
+python main/sensitivity_weekly_momentum.py --null-test   # is the signal real, or concentration luck?
+python main/sensitivity_weekly_momentum.py --oat         # parameter sensitivity + weekday robustness
+```
+
+The 2026-07 diagnostic verdict: the momentum signal's CAGR contribution is unambiguous (100th percentile vs 100 turnover-matched random-selection portfolios), its Sharpe contribution is ~90th percentile (real but modest - the signal picks higher-vol names), and no single parameter change moves Sharpe below ~1.1. Only ~9% of parameter variants beat the equal-weight universe on Sharpe: this strategy is a return-enhancer, not a risk-adjusted-return enhancer. The whole history is walk-forward (signals never see the future), but remember the universe is today's index membership, so absolute numbers are survivorship-flattered — the fairest read is Strategy vs the equal-weight benchmark of the *same* universe.
 
 **Holistic weekly method (layers 2-4 on top of the momentum core):** compares the deployed method against variants adding short-term reversal, a pooled cross-sectional ML ranker, and an HMM+turbulence regime gate — each admitted only if it improves out-of-sample results:
 
@@ -72,6 +81,8 @@ python main/deploy_weekly_momentum.py --execute  # submits orders (paper while P
 `--holistic` switches to the full six-layer method (reversal + ML ranker + HMM/turbulence gate). As of the 2026-07 comparison the extra layers cut volatility and drawdown but cost too much return and turnover to be admitted (Sharpe 1.07 vs 1.23 at 10 bps) - keep the default. Re-run `main/backtest_weekly_holistic.py` before ever flipping it, and paper-trade the switch like any new strategy.
 
 Orders are market DAY orders: run after the close and they queue for the next open. Sells are submitted before buys; dropped names are liquidated by share quantity; trades under 0.5% of equity are skipped to control churn. Each run appends to `live_weekly_momentum.md`.
+
+Hardening (2026-07): the universe scrape now retries with backoff, validates the parse (count, ticker syntax, overlap with the last known-good list), and falls back to the committed `src/data/nasdaq100_snapshot.csv` on failure - a Wikipedia outage can no longer fail (or worse, mis-trade) the Friday run. Prices use a bounded `ffill(limit=5)` so a halted/delisted name drops out instead of being carried at a flat price, and the run aborts if the latest bar is more than 4 days old. Rank buffering (`--buffer-mult`, default 1.5) treats your actual account positions as incumbents.
 
 ## 3. Live / paper trading — scheduled (recommended)
 
