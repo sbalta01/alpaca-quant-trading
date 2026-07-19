@@ -2,6 +2,8 @@
 
 How to run this repo yourself, for backtesting and for live/paper trading. The recommended production path is the **weekly momentum portfolio** (`src/strategies/weekly_momentum.py`) deployed through **GitHub Actions on a Friday-evening schedule**, exactly like your existing monthly rebalance job. Reasons: it needs no GPU/torch/sklearn so CI runs are fast and cheap, it has no model files to version, every decision is reproducible from the day's closes, and it reuses the Alpaca execution pattern you already trust.
 
+**Live default config (2026-07-19):** S&P 500 universe, top-10 by 12-1/6-1 momentum, inverse-vol weights capped at 20%, rank buffer 1.5x, 0.5% no-trade band, 200dma gate, **vol targeting at 0.20 annualized**. Backtested 2016-2026 at 10 bps: Sharpe 1.15, CAGR ~22%, MaxDD -24%, turnover ~10x/yr. Chosen over NASDAQ-100 (Sharpe 1.21, CAGR 37%, MaxDD -35%, semiconductor-concentrated) as the macro-defensive configuration: broader universe, vol-clamped drawdowns. `--universe nasdaq100 --target-vol 0` recovers the aggressive config.
+
 ## 0. One-time setup (local)
 
 ```bash
@@ -34,6 +36,10 @@ python main/backtest_weekly_momentum.py --tickers AAPL MSFT NVDA AMZN GOOG META 
 ```
 
 It prints: metrics table (Strategy vs equal-weight universe vs QQQ vs SPY over the identical window), yearly returns, annualized turnover with its cost implication, and **the exact portfolio it would buy today**. Defaults now match live: rank buffering (`--buffer-mult 1.5`, hold a name until it exits the top 15) and the live 0.5% no-trade band — together they halve turnover (19x -> ~10x/yr) at unchanged Sharpe. `--buffer-mult 1.0 --min-trade-fraction 0` recovers the old behavior.
+
+**Vol targeting** (`--target-vol`, off by default): scales gross exposure toward a target annualized portfolio volatility using the full trailing covariance (max of 21d/63d windows, never levers above 1.0), composed with the 200dma gate. Backtested 2016-2026 on the momentum sleeve at 10 bps: `--target-vol 0.30` improved Sharpe (1.21 -> 1.25) and Calmar (1.05 -> 1.15) and cut MaxDD (-35% -> -27%) for ~6 CAGR points (37% -> 31%). Available in both the backtest and deploy scripts; paper-trade before enabling live.
+
+**Cross-asset trend sleeve** (`main/backtest_cross_asset.py`): the same machinery on 9 asset-class ETFs (SPY QQQ VEA EEM TLT IEF GLD DBC VNQ), top-4 by momentum, inverse-vol, 10%-vol-targeted, no dma gate (bonds/gold are the defensive asset). 2008-2026 at 5 bps: CAGR 7.0%, Sharpe 0.75, MaxDD -19% (vs SPY -47%), turnover 3.9x. It does NOT beat 60/40 on Sharpe (0.75 vs 0.83) - its role is a risk-controlled diversifier sleeve next to the concentrated momentum book (best-in-table Calmar, and `--top-k 3` drops correlation to SPY to 0.60), not a return engine. Run the ablations (`--no-vol-target`, `--top-k 3`) before changing its config.
 
 **Diagnostics** (run these before trusting any config change):
 

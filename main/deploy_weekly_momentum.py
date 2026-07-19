@@ -75,6 +75,14 @@ def main():
                    help="Rank-buffer width: hold incumbents until they exit the "
                         "top buffer_mult*k. 1.0 = no buffering (old behavior). "
                         "Backtested 2016-2026: halves turnover at equal Sharpe.")
+    p.add_argument("--target-vol", type=float, default=0.20,
+                   help="Vol targeting at this annualized vol, composed with the "
+                        "200dma gate. Backtested 2016-2026 on S&P 500: Sharpe "
+                        "1.10->1.15, MaxDD -31%%->-24%%, CAGR 30%%->22%%. "
+                        "Pass 0 to disable.")
+    p.add_argument("--universe", choices=["sp500", "nasdaq100"], default="sp500",
+                   help="Universe when --tickers is not given. Default sp500 "
+                        "(broader, less semiconductor-concentrated than nasdaq100).")
     p.add_argument("--tickers", nargs="+", default=None)
     p.add_argument("--holistic", action="store_true",
                    help="Use the full holistic method (layers 2-4: reversal + ML "
@@ -91,8 +99,11 @@ def main():
     # 1) Universe and data
     if args.tickers:
         universe = args.tickers
+    elif args.universe == "sp500":
+        from src.data.universe import fetch_sp500_symbols
+        universe = fetch_sp500_symbols()
     else:
-        from src.data.data_loader import fetch_nasdaq_100_symbols
+        from src.data.universe import fetch_nasdaq_100_symbols
         universe = fetch_nasdaq_100_symbols()
     # 600d covers 252+21 momentum + 200dma; the holistic ML layer needs ~3.5y
     # of weekly cross-sections on top of the ~1y feature warm-up.
@@ -140,10 +151,16 @@ def main():
         # buffer_mult*k, killing rank-10<->11 churn. --buffer-mult 1.0 disables.
         selector = BufferedSelector(args.buffer_mult)
         selector.held = [s for s in positions if s in prices.columns]
+        exposure_fn = None
+        if args.target_vol and args.target_vol > 0:
+            from src.strategies.weekly_momentum import make_vol_target_exposure
+            exposure_fn = make_vol_target_exposure(
+                target_vol=args.target_vol, with_regime_gate=True,
+                low_exposure=args.low_exposure)
         w = compute_target_weights(prices, bench["SPY"], top_k=args.top_k,
                                    weight_cap=args.weight_cap,
                                    low_exposure=args.low_exposure,
-                                   selector=selector)
+                                   selector=selector, exposure_fn=exposure_fn)
     print(f"Signal date: {prices.index[-1].date()} | gross exposure {w.sum():.2f}")
     print((w * 100).round(2).to_string(), f"\nCash: {(1 - w.sum()) * 100:.2f}%\n")
 

@@ -167,6 +167,41 @@ def test_no_snapshot_and_dead_network_raises():
     print("dead network with no snapshot raises UniverseError: OK")
 
 
+def test_sp500_fetcher():
+    """The S&P 500 variant shares the pipeline: Symbol-column table, 490-510
+    plausibility range, its own snapshot fallback."""
+    from src.data.universe import fetch_sp500_symbols, parse_universe
+
+    sp_tickers = [f"S{i:03d}".replace("0", "P").replace("1", "Q")
+                  .replace("2", "R").replace("3", "S").replace("4", "T")
+                  .replace("5", "U").replace("6", "V").replace("7", "W")
+                  .replace("8", "X").replace("9", "Y") for i in range(500)]
+    rows = "\n".join(f"<tr><td>{t}</td><td>Co {t}</td></tr>" for t in sp_tickers)
+    html = f"<table><tr><th>Symbol</th><th>Security</th></tr>{rows}</table>"
+    assert len(parse_universe(html, "Symbol")) == 500
+
+    # too-few list must be rejected for SP500 range even though it passes NASDAQ's
+    try:
+        validate_universe(sp_tickers[:100], min_count=490, max_count=510)
+        raise AssertionError("100 tickers must fail the SP500 range")
+    except ValueError:
+        pass
+
+    with tempfile.TemporaryDirectory() as td:
+        snap = os.path.join(td, "sp500_snap.csv")
+        save_snapshot(sp_tickers, snap)
+        old = universe.SP500_SNAPSHOT_PATH
+        universe.SP500_SNAPSHOT_PATH = snap
+        try:
+            (out, _) = with_fake_get(
+                [requests.ConnectionError("down")] * 5,
+                lambda: fetch_sp500_symbols(refresh_snapshot=False))
+            assert out == sp_tickers, "SP500 outage must fall back to its snapshot"
+        finally:
+            universe.SP500_SNAPSHOT_PATH = old
+    print("sp500 fetcher: parse, range validation, snapshot fallback: OK")
+
+
 def test_snapshot_roundtrip():
     with tempfile.TemporaryDirectory() as td:
         snap = os.path.join(td, "snap.csv")
@@ -185,5 +220,6 @@ if __name__ == "__main__":
     test_fallback_to_snapshot()
     test_bad_parse_falls_back()
     test_no_snapshot_and_dead_network_raises()
+    test_sp500_fetcher()
     test_snapshot_roundtrip()
     print("\nAll universe tests passed.")

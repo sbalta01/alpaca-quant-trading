@@ -31,12 +31,15 @@ import pandas as pd
 import requests
 
 NASDAQ_100_URL = "https://en.wikipedia.org/wiki/List_of_NASDAQ-100_companies"
+SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
-SNAPSHOT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "nasdaq100_snapshot.csv")
+_DIR = os.path.dirname(os.path.abspath(__file__))
+SNAPSHOT_PATH = os.path.join(_DIR, "nasdaq100_snapshot.csv")
+SP500_SNAPSHOT_PATH = os.path.join(_DIR, "sp500_snapshot.csv")
 
 TICKER_RE = re.compile(r"^[A-Z][A-Z.\-]{0,5}$")
-MIN_COUNT, MAX_COUNT = 90, 110
+MIN_COUNT, MAX_COUNT = 90, 110          # NASDAQ-100 plausibility range
+SP500_MIN, SP500_MAX = 490, 510
 MIN_OVERLAP = 0.85          # Jaccard similarity vs the snapshot
 
 
@@ -66,18 +69,23 @@ def fetch_with_retry(url: str, *, headers: dict = None, timeout: float = 15.0,
     raise last_err
 
 
-def parse_nasdaq_100(html: str) -> List[str]:
-    """Extract tickers from the constituents table (the one with a Ticker column)."""
+def parse_universe(html: str, ticker_col: str) -> List[str]:
+    """Extract tickers from the constituents table (the one with `ticker_col`)."""
     tables = pd.read_html(StringIO(html))
-    df = next(tbl for tbl in tables if "Ticker" in tbl.columns)
-    return [str(s).replace(".", "-") for s in df["Ticker"].tolist()]
+    df = next(tbl for tbl in tables if ticker_col in tbl.columns)
+    return [str(s).replace(".", "-") for s in df[ticker_col].tolist()]
 
 
-def validate_universe(symbols: List[str], reference: List[str] = None) -> None:
-    """Raise ValueError if `symbols` does not look like a NASDAQ-100 list."""
-    if not (MIN_COUNT <= len(symbols) <= MAX_COUNT):
+def parse_nasdaq_100(html: str) -> List[str]:
+    return parse_universe(html, "Ticker")
+
+
+def validate_universe(symbols: List[str], reference: List[str] = None,
+                      min_count: int = MIN_COUNT, max_count: int = MAX_COUNT) -> None:
+    """Raise ValueError if `symbols` does not look like a plausible index list."""
+    if not (min_count <= len(symbols) <= max_count):
         raise ValueError(f"implausible universe size: {len(symbols)} "
-                         f"(expected {MIN_COUNT}-{MAX_COUNT})")
+                         f"(expected {min_count}-{max_count})")
     bad = [s for s in symbols if not TICKER_RE.match(s)]
     if bad:
         raise ValueError(f"implausible tickers: {bad[:5]}")
@@ -105,26 +113,29 @@ def save_snapshot(symbols: List[str], path: str = None) -> None:
         path or SNAPSHOT_PATH, index=False)
 
 
-def fetch_nasdaq_100_symbols(use_snapshot_fallback: bool = True,
-                             refresh_snapshot: bool = True,
-                             url: str = NASDAQ_100_URL) -> List[str]:
+def _fetch_index_symbols(url: str, ticker_col: str, snapshot_path: str,
+                         min_count: int, max_count: int,
+                         use_snapshot_fallback: bool = True,
+                         refresh_snapshot: bool = True) -> List[str]:
     """
-    Current NASDAQ-100 membership, with retry, validation, and snapshot fallback.
+    Shared fetch pipeline: retry -> parse -> validate -> refresh snapshot,
+    falling back to the committed snapshot on any failure.
 
     Never returns an unvalidated list: a syntactically-alive but semantically
     wrong scrape falls back to the snapshot just like an outage does.
     """
     try:
-        snapshot, snap_date = load_snapshot()
+        snapshot, snap_date = load_snapshot(snapshot_path)
     except (FileNotFoundError, KeyError, IndexError):
         snapshot, snap_date = None, None
 
     try:
-        symbols = parse_nasdaq_100(fetch_with_retry(url))
-        validate_universe(symbols, reference=snapshot)
+        symbols = parse_universe(fetch_with_retry(url), ticker_col)
+        validate_universe(symbols, reference=snapshot,
+                          min_count=min_count, max_count=max_count)
         if refresh_snapshot:
             try:
-                save_snapshot(symbols)
+                save_snapshot(symbols, snapshot_path)
             except OSError as e:                     # read-only FS is non-fatal
                 print(f"  (could not refresh snapshot: {e})")
         return symbols
@@ -137,3 +148,20 @@ def fetch_nasdaq_100_symbols(use_snapshot_fallback: bool = True,
               f"snapshot of {len(snapshot)} tickers from {snap_date.date()} "
               f"({age}d old)")
         return snapshot
+
+
+def fetch_nasdaq_100_symbols(use_snapshot_fallback: bool = True,
+                             refresh_snapshot: bool = True,
+                             url: str = NASDAQ_100_URL) -> List[str]:
+    """Current NASDAQ-100 membership: retry, validation, snapshot fallback."""
+    return _fetch_index_symbols(url, "Ticker", SNAPSHOT_PATH, MIN_COUNT, MAX_COUNT,
+                                use_snapshot_fallback, refresh_snapshot)
+
+
+def fetch_sp500_symbols(use_snapshot_fallback: bool = True,
+                        refresh_snapshot: bool = True,
+                        url: str = SP500_URL) -> List[str]:
+    """Current S&P 500 membership: retry, validation, snapshot fallback."""
+    return _fetch_index_symbols(url, "Symbol", SP500_SNAPSHOT_PATH,
+                                SP500_MIN, SP500_MAX,
+                                use_snapshot_fallback, refresh_snapshot)

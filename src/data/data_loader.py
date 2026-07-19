@@ -23,10 +23,10 @@ API_SECRET = os.getenv("API_SECRET")
 PAPER = os.getenv("PAPER")
 
 def fetch_sp500_symbols():
-    url = 'https://datahub.io/core/s-and-p-500-companies/r/constituents.csv'
-    df = pd.read_csv(url)
-    df[['Symbol']].to_csv('sp500.csv', index=False)
-    print("sp500.csv created with", len(df), "symbols.")
+    # Delegates to the hardened fetcher (retry + validation + committed-snapshot
+    # fallback). Returns the symbol list (old version wrote sp500.csv, returned None).
+    from src.data.universe import fetch_sp500_symbols as _fetch
+    return _fetch()
 
 # def fetch_nasdaq_100_symbols():
 #     url = "https://en.wikipedia.org/wiki/NASDAQ-100"

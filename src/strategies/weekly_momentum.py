@@ -101,6 +101,7 @@ def compute_target_weights(
     ma_window: int = 200,
     low_exposure: float = 0.4,
     selector: Callable[[pd.Series, int], pd.Index] = None,
+    exposure_fn: Callable[[pd.DataFrame, pd.Series, pd.Series], float] = None,
 ) -> pd.Series:
     """
     Target portfolio weights as of prices.index[-1] (weights sum to <= 1;
@@ -109,13 +110,20 @@ def compute_target_weights(
     `selector(scores, top_k) -> Index` chooses which names to hold; defaults to
     top_k by score. Swapping it is how the random-k null test and rank
     buffering plug in without forking this function.
+
+    `exposure_fn(prices, benchmark, weights) -> float` sets gross exposure;
+    defaults to the 200dma regime gate. `make_vol_target_exposure(...)` builds
+    a vol-targeting version (optionally combined with the gate).
     """
     score_today = momentum_scores(prices, lookbacks, skip).iloc[-1].dropna()
     if score_today.empty:
         return pd.Series(dtype=float)
     members = (selector or default_selector)(score_today, top_k)
     w = inverse_vol_weights(prices, members, vol_window, weight_cap)
-    expo = regime_exposure(benchmark, ma_window, low_exposure)
+    if exposure_fn is not None:
+        expo = exposure_fn(prices, benchmark, w)
+    else:
+        expo = regime_exposure(benchmark, ma_window, low_exposure)
     return (w * expo).sort_values(ascending=False)
 
 
@@ -125,6 +133,83 @@ def weekly_rebalance_dates(index: pd.DatetimeIndex) -> pd.DatetimeIndex:
     iso = index.isocalendar()
     last = s.groupby([iso.year.values, iso.week.values]).last()
     return pd.DatetimeIndex(sorted(last.values))
+
+
+def realized_portfolio_vol(
+    prices: pd.DataFrame,
+    weights: pd.Series,
+    window: int = 63,
+    periods_per_year: int = 252,
+) -> float:
+    """
+    Annualized volatility of the (fully-invested) book over the trailing
+    `window` daily returns ending at prices.index[-1] - causal by construction.
+
+    Uses the FULL covariance (w' Sigma w), not the sum of individual vols: a
+    10-name semiconductor book with pairwise correlations of 0.6-0.8 is ~30%
+    more volatile than the diagonal alone suggests, and ignoring that would
+    make vol targeting systematically over-lever.
+    """
+    if len(weights) == 0:
+        return np.nan
+    w = weights / weights.sum() if weights.sum() > 0 else weights
+    rets = prices[w.index].pct_change(fill_method=None).iloc[-window:]
+    cov = rets.cov() * periods_per_year
+    var = float(w.values @ cov.values @ w.values)
+    return np.sqrt(var) if np.isfinite(var) and var >= 0 else np.nan
+
+
+def vol_target_exposure(
+    prices: pd.DataFrame,
+    weights: pd.Series,
+    target_vol: float = 0.20,
+    windows: Tuple[int, ...] = (21, 63),
+    max_exposure: float = 1.0,
+    min_exposure: float = 0.0,
+) -> float:
+    """
+    Gross exposure that scales the book toward `target_vol` annualized.
+
+    Takes the MAX vol estimate across `windows` (fast 21d + slow 63d): the
+    short window reacts quickly to a vol spike (de-risk fast), while the long
+    window stays elevated afterwards (re-risk slowly) - mitigating realized-vol
+    targeting's known pathology of re-levering straight into a rebound.
+
+    `max_exposure` defaults to 1.0 and should stay there: no leverage. In calm
+    regimes the formula will ask for >1x; if you want that upside, raise
+    `target_vol`, don't raise the cap.
+    """
+    if len(weights) == 0:
+        return max_exposure
+    est = max(realized_portfolio_vol(prices, weights, w) for w in windows)
+    if not np.isfinite(est) or est <= 0:
+        return max_exposure
+    return float(np.clip(target_vol / est, min_exposure, max_exposure))
+
+
+def make_vol_target_exposure(
+    target_vol: float = 0.20,
+    windows: Tuple[int, ...] = (21, 63),
+    max_exposure: float = 1.0,
+    min_exposure: float = 0.0,
+    with_regime_gate: bool = True,
+    ma_window: int = 200,
+    low_exposure: float = 0.4,
+):
+    """
+    Build an `exposure_fn(prices, benchmark, weights) -> float` for
+    compute_target_weights / run_walkforward: vol targeting, optionally
+    multiplied by the 200dma regime gate (set with_regime_gate=False, or
+    low_exposure=1.0, to run vol targeting alone).
+    """
+    def exposure_fn(prices: pd.DataFrame, benchmark: pd.Series,
+                    weights: pd.Series) -> float:
+        expo = vol_target_exposure(prices, weights, target_vol, windows,
+                                   max_exposure, min_exposure)
+        if with_regime_gate:
+            expo *= regime_exposure(benchmark, ma_window, low_exposure)
+        return float(np.clip(expo, min_exposure, max_exposure))
+    return exposure_fn
 
 
 class BufferedSelector:
@@ -198,6 +283,7 @@ def run_walkforward(
     selector_factory: Callable[[], Callable[[pd.Series, int], pd.Index]] = None,
     rebal_dates: pd.DatetimeIndex = None,
     min_trade_fraction: float = 0.0,
+    exposure_fn: Callable[[pd.DataFrame, pd.Series, pd.Series], float] = None,
 ) -> dict:
     """
     Walk-forward weekly backtest.
@@ -264,7 +350,7 @@ def run_walkforward(
             w_new = compute_target_weights(
                 hist, benchmark.loc[:date], top_k, lookbacks, skip,
                 vol_window, weight_cap, ma_window, low_exposure,
-                selector=selector,
+                selector=selector, exposure_fn=exposure_fn,
             )
             # No-trade band: leave sub-threshold deltas at their current weight,
             # exactly as the live executor does. Default 0.0 = trade everything.
