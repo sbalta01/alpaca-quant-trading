@@ -41,6 +41,33 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: python main/deploy_weekly_momentum.py --execute
 
+      - name: Extract latest run summary
+        if: always()
+        run: |
+          # Grab everything from the most recent run header to end of file
+          # so the email reports only this run's balance and movements.
+          start=$(grep -n "weekly momentum rebalance" live_weekly_momentum.md | tail -1 | cut -d: -f1)
+          if [ -n "${start}" ]; then
+            tail -n +"${start}" live_weekly_momentum.md > latest_weekly_momentum.md
+          else
+            cp live_weekly_momentum.md latest_weekly_momentum.md
+          fi
+          cat latest_weekly_momentum.md
+
+      - name: Send report as email body
+        if: always()
+        uses: dawidd6/action-send-mail@v6
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port:    ${{ secrets.SMTP_PORT }}
+          username:       ${{ secrets.SMTP_USERNAME }}
+          password:       ${{ secrets.SMTP_PASSWORD }}
+          subject:        "Weekly Momentum Rebalance Report"
+          from:           ${{ secrets.SMTP_USERNAME }}
+          to:             ${{ secrets.SMTP_USERNAME }}
+          content_type:   text/plain
+          body:           file://latest_weekly_momentum.md
+
       - name: Commit report
         run: |
           git config user.name  "github-actions[bot]"
