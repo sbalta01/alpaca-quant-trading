@@ -43,3 +43,8 @@ Signal date 2026-07-23, equity $100,000.00, gross exposure 0.24
 - BUY  $2104.69 MRVL  [submitted]
 - BUY  $1925.9 SNDK  [submitted]
 
+2026-07-31 22:33:19.770324+00:00: weekly momentum rebalance (EXECUTED)
+Signal date 2026-07-30, equity $98,654.74, gross exposure 0.21
+
+- SELL $531.21 WDC  [submitted]
+
