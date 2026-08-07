@@ -48,3 +48,11 @@ Signal date 2026-07-30, equity $98,654.74, gross exposure 0.21
 
 - SELL $531.21 WDC  [submitted]
 
+2026-08-07 22:06:29.246358+00:00: weekly momentum rebalance (EXECUTED)
+Signal date 2026-08-06, equity $100,261.40, gross exposure 0.22
+
+- SELL $861.17 LITE  [submitted]
+- SELL $571.84 CIEN  [submitted]
+- SELL $520.5 MRVL  [submitted]
+- BUY  $606.45 FLEX  [submitted]
+
