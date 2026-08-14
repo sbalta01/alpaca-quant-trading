@@ -56,3 +56,11 @@ Signal date 2026-08-06, equity $100,261.40, gross exposure 0.22
 - SELL $520.5 MRVL  [submitted]
 - BUY  $606.45 FLEX  [submitted]
 
+2026-08-14 21:50:09.629088+00:00: weekly momentum rebalance (EXECUTED)
+Signal date 2026-08-13, equity $102,619.29, gross exposure 0.23
+
+- SELL ALL CIEN  [submitted]
+- SELL $616.5 STX  [submitted]
+- SELL $541.8 SNDK  [submitted]
+- BUY  $2928.45 AMD  [submitted]
+
