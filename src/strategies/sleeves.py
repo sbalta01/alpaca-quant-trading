@@ -18,9 +18,9 @@ win a momentum contest against 500 single-stock fat tails). Diversification has 
 happen at the CAPITAL-SPLIT level: run the momentum book on part of the account and
 an uncorrelated sleeve on the rest.
 
-Measured 9y walk-forward at 10bps, 70/30:
+Measured 9y walk-forward at 10bps, 60/40:
     momentum only  CAGR 20.1%  Sharpe 1.08  MaxDD -24.9%
-    70/30 combined CAGR 16.0%  Sharpe 1.13  MaxDD -20.3%   (sleeve corr 0.25)
+    60/40 combined CAGR 15.1%  Sharpe 1.22  MaxDD -15.9%   (sleeve corr 0.15)
 It buys risk-adjusted return and drawdown with CAGR - not more return.
 
 This module is deliberately pure: config dataclasses and pure functions, no
@@ -52,30 +52,38 @@ class SleeveConfig:
 
 
 # The live momentum book, unchanged in every respect except that it now sizes
-# against 70% of equity instead of 100%.
+# against 60% of equity instead of 100%.
 MOMENTUM = SleeveConfig(
     name="momentum",
-    allocation=0.70,
+    allocation=0.60,
     universe=None,          # resolved from the S&P 500 at run time
     residual=True,          # also owns any position no other sleeve claims
 )
 
-# Pure diversifiers: long-duration and intermediate Treasuries, gold, broad
-# commodities, REITs. SPY/QQQ are deliberately EXCLUDED - a "diversifier" sleeve
-# that can go 100% long US equity will do exactly that in a momentum-friendly
-# regime, stacking beta on the stock book precisely when it should be offsetting
-# it. Measured correlation to the momentum sleeve: 0.26 without SPY/QQQ, 0.63 with.
+# Duration (TLT/IEF/SHY), inflation-linked (TIP), metals (GLD/SLV), broad
+# commodities (DBC) and the dollar (UUP).
 #
-# weight_cap 0.60 is load-bearing, not arbitrary - see validate_sleeves.
+# The exclusions are the point of this list. Anything carrying structural equity
+# beta is left out, because it stops being a diversifier exactly when one is
+# needed - it sells off with the stock book. Measured 3y daily correlation to
+# SPY: HYG 0.75, EMB 0.60, VNQ 0.52, LQD 0.37, versus TLT 0.15, DBC 0.11,
+# IEF 0.09, SHY 0.06, UUP -0.10. So: no REITs, no high yield, no EM debt, no IG
+# credit, and no SPY/QQQ/VEA/EEM (which would stack equity beta on a book that
+# is already levered to it).
+#
+# That exclusion rule is worth ~0.05 Sharpe and ~2.4 points of drawdown on the
+# blend: adding VNQ back drops it 1.18 -> 1.15, adding credit 1.18 -> 1.14.
+#
+# weight_cap 0.40 is load-bearing, not arbitrary - see validate_sleeves.
 # No 200dma gate: when equities roll over the right response for THIS sleeve is
 # rotating into bonds/gold, not going to cash on an equity signal.
 DIVERSIFIER = SleeveConfig(
     name="diversifier",
-    allocation=0.30,
-    universe=("TLT", "IEF", "GLD", "DBC", "VNQ"),
+    allocation=0.40,
+    universe=("TLT", "IEF", "SHY", "TIP", "GLD", "SLV", "DBC", "UUP"),
     residual=False,
-    top_k=2,
-    weight_cap=0.60,
+    top_k=3,
+    weight_cap=0.40,
     target_vol=0.10,
     use_dma_gate=False,
     low_exposure=1.0,
