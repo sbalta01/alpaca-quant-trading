@@ -12,7 +12,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.strategies.weekly_momentum import (
-    BufferedSelector, default_selector, run_walkforward,
+    BufferedSelector, apply_no_trade_band, default_selector, run_walkforward,
 )
 
 
@@ -116,6 +116,31 @@ def test_no_trade_band(prices, bench):
           f"{to_a:.1f}x -> {to_band:.1f}x/yr: OK")
 
 
+def test_band_extraction_matches_inline(prices, bench):
+    """`apply_no_trade_band` was extracted out of run_walkforward so the live
+    deployer and the backtest share one implementation. It must reproduce the
+    inline logic exactly - including that it is a no-op with no current book."""
+    target = pd.Series({"A": 0.30, "B": 0.20, "C": 0.10})
+    current = pd.Series({"A": 0.299, "B": 0.15, "D": 0.05})
+
+    # reference: the pre-extraction inline block, verbatim
+    names = target.index.union(current.index)
+    tgt = target.reindex(names, fill_value=0.0)
+    cur = current.reindex(names, fill_value=0.0)
+    small = (tgt - cur).abs() < 0.005
+    tgt[small] = cur[small]
+    expected = tgt[tgt > 0].sort_values(ascending=False)
+
+    pd.testing.assert_series_equal(
+        apply_no_trade_band(target, current, 0.005), expected)
+    # identity paths
+    pd.testing.assert_series_equal(
+        apply_no_trade_band(target, current, 0.0), target)
+    pd.testing.assert_series_equal(
+        apply_no_trade_band(target, pd.Series(dtype=float), 0.005), target)
+    print("apply_no_trade_band reproduces the inline block bit-for-bit: OK")
+
+
 def test_always_returns_k(prices, bench):
     """Selector must always fill exactly k slots (or all names if fewer)."""
     sel = BufferedSelector(buffer_mult=2.0)
@@ -135,5 +160,6 @@ if __name__ == "__main__":
     test_holds_through_buffer_zone_then_drops()
     test_missing_incumbent_does_not_raise()
     test_no_trade_band(prices, bench)
+    test_band_extraction_matches_inline(prices, bench)
     test_always_returns_k(prices, bench)
     print("\nAll buffering tests passed.")

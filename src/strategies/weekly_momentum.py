@@ -268,6 +268,31 @@ def weekly_rebalance_dates_on(index: pd.DatetimeIndex, weekday: int = 4) -> pd.D
     return pd.DatetimeIndex(sorted(last.values))
 
 
+def apply_no_trade_band(
+    target: pd.Series,
+    current: pd.Series,
+    min_trade_fraction: float,
+) -> pd.Series:
+    """
+    Leave sub-threshold weight deltas at their current weight.
+
+    Shared by `run_walkforward` and the live deployer so the backtest's
+    no-trade band and the executed one cannot drift apart. Both must apply it
+    in the SAME weight space: for a sleeve, weights are relative to that
+    sleeve's allocated capital, not to total account equity.
+
+    min_trade_fraction <= 0 (or no current book) returns `target` unchanged.
+    """
+    if min_trade_fraction <= 0 or len(current) == 0:
+        return target
+    names = target.index.union(current.index)
+    tgt = target.reindex(names, fill_value=0.0)
+    cur = current.reindex(names, fill_value=0.0)
+    small = (tgt - cur).abs() < min_trade_fraction
+    tgt[small] = cur[small]
+    return tgt[tgt > 0].sort_values(ascending=False)
+
+
 def run_walkforward(
     prices: pd.DataFrame,
     benchmark: pd.Series,
@@ -354,13 +379,7 @@ def run_walkforward(
             )
             # No-trade band: leave sub-threshold deltas at their current weight,
             # exactly as the live executor does. Default 0.0 = trade everything.
-            if min_trade_fraction > 0 and len(w_current) > 0:
-                names = w_new.index.union(w_current.index)
-                tgt = w_new.reindex(names, fill_value=0.0)
-                cur = w_current.reindex(names, fill_value=0.0)
-                small = (tgt - cur).abs() < min_trade_fraction
-                tgt[small] = cur[small]
-                w_new = tgt[tgt > 0].sort_values(ascending=False)
+            w_new = apply_no_trade_band(w_new, w_current, min_trade_fraction)
             all_names = w_new.index.union(w_current.index)
             turnover = float(
                 (w_new.reindex(all_names, fill_value=0.0)

@@ -2,7 +2,20 @@
 
 How to run this repo yourself, for backtesting and for live/paper trading. The recommended production path is the **weekly momentum portfolio** (`src/strategies/weekly_momentum.py`) deployed through **GitHub Actions on a Friday-evening schedule**, exactly like your existing monthly rebalance job. Reasons: it needs no GPU/torch/sklearn so CI runs are fast and cheap, it has no model files to version, every decision is reproducible from the day's closes, and it reuses the Alpaca execution pattern you already trust.
 
-**Live default config (2026-07-19):** S&P 500 universe, top-10 by 12-1/6-1 momentum, inverse-vol weights capped at 20%, rank buffer 1.5x, 0.5% no-trade band, 200dma gate, **vol targeting at 0.20 annualized**. Backtested 2016-2026 at 10 bps: Sharpe 1.15, CAGR ~22%, MaxDD -24%, turnover ~10x/yr. Chosen over NASDAQ-100 (Sharpe 1.21, CAGR 37%, MaxDD -35%, semiconductor-concentrated) as the macro-defensive configuration: broader universe, vol-clamped drawdowns. `--universe nasdaq100 --target-vol 0` recovers the aggressive config.
+**Live default config (2026-08-19): two sleeves.** The Friday job now runs `main/deploy_sleeves.py`, which splits the account **70% momentum / 30% diversifier** and submits one netted set of orders.
+
+* **Momentum sleeve (70%)** — unchanged strategy, now sized against 70% of equity.
+* **Diversifier sleeve (30%)** — `TLT, IEF, GLD, DBC, VNQ`, top-2 by the same momentum machinery, inverse-vol capped at 60%, vol targeting at 0.10, **no 200dma gate** (when equities roll over the right response for this sleeve is rotating into bonds/gold, not going to cash on an equity signal).
+
+Why: the momentum book is a concentrated single-sector bet by construction (a typical week is 10 semiconductor names at 0.54 average pairwise correlation and ~73% book vol), so full-covariance vol targeting drives gross exposure to ~0.25 and leaves ~75% of capital idle. Widening `top_k` does not fix it — measured Sharpe falls 1.01 (k=10) to 0.79 (k=40), pure alpha dilution — and merging ETFs into the stock ranking is a no-op (no ETF entered the top-10 across 522 weeks). Diversification has to happen at the capital-split level.
+
+Measured 9y walk-forward at 10 bps: momentum-only CAGR 20.1% / Sharpe 1.08 / MaxDD -24.9% → **70/30 blend CAGR 16.0% / Sharpe 1.13 / MaxDD -20.3%**, sleeve correlation 0.25, blended invested capital 0.57 → 0.63. Sharpe is a flat plateau (1.10-1.14) across every split from 40/60 to 90/10, so the exact split is not a tuned parameter. It buys risk-adjusted return and drawdown with CAGR — it is not a return improvement. Reproduce with `python main/backtest_two_sleeve.py --years 9 --cost-bps 10 --sweep`.
+
+Note the survivorship asymmetry works *in the blend's favour*: the momentum sleeve is flattered by using today's index membership over all history, the ETF sleeve is not.
+
+**Shared-account safety.** Both sleeves trade one Alpaca account, and `build_orders` liquidates any position it is shown that is not in its target list. Two independent jobs would therefore have each sleeve sell the other's book every week. `deploy_sleeves.py` avoids this by reading the account once, netting both sleeves into a single account-level target vector, and submitting one order set (which also gives correct *global* sells-before-buys). A sleeve that fails to compute is marked `SKIPPED` and its symbols are removed from the managed set — never represented as "target 0", which would read as "liquidate everything I hold". `main/deploy_weekly_momentum.py` still exists for single-sleeve runs but now refuses to start if the account holds another sleeve's positions (override with `--force`).
+
+**Previous single-sleeve default (2026-07-19):** S&P 500 universe, top-10 by 12-1/6-1 momentum, inverse-vol weights capped at 20%, rank buffer 1.5x, 0.5% no-trade band, 200dma gate, **vol targeting at 0.20 annualized**. Backtested 2016-2026 at 10 bps: Sharpe 1.15, CAGR ~22%, MaxDD -24%, turnover ~10x/yr. Chosen over NASDAQ-100 (Sharpe 1.21, CAGR 37%, MaxDD -35%, semiconductor-concentrated) as the macro-defensive configuration: broader universe, vol-clamped drawdowns. `--universe nasdaq100 --target-vol 0` recovers the aggressive config.
 
 ## 0. One-time setup (local)
 
@@ -101,7 +114,9 @@ One-time GitHub setup:
 4. Actions tab → enable workflows → you can trigger a first run manually via "Run workflow" (workflow_dispatch) to check the logs.
 5. Each run commits its report (`live_weekly_momentum.md`) back to the repo, so your trade history is versioned.
 
-Your existing monthly Monte-Carlo rebalance (`deploying-rebalance-portfolio.yml`) can keep running in parallel — they're separate sleeves; just be aware they share the same Alpaca account equity unless you split accounts.
+The momentum and diversifier sleeves are now implemented as one job (`main/deploy_sleeves.py`), not as an aspiration — see the two-sleeve section at the top.
+
+Your existing monthly Monte-Carlo rebalance (`deploying-rebalance-portfolio.yml`) is `workflow_dispatch`-only (its cron is commented out), so there is no live conflict today. If you ever re-enable it, note that the residual momentum sleeve treats any position no sleeve's universe claims as an orphan and liquidates it — the run prints a loud `WARNING` and records it in the emailed report's `WARNINGS:` line whenever that happens. To coexist, add those symbols to a sleeve universe or run with `--no-liquidate-orphans`.
 
 ## 4. Go-live checklist
 

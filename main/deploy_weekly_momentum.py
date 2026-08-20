@@ -24,6 +24,8 @@ from dotenv import load_dotenv
 sys.path.insert(0, ".")
 
 from src.strategies.weekly_momentum import BufferedSelector, compute_target_weights
+from src.execution.orders import (MIN_ORDER_NOTIONAL, MIN_TRADE_FRACTION,
+                                  build_orders)
 from main.backtest_weekly_momentum import fetch_close_matrix
 
 load_dotenv()
@@ -32,37 +34,8 @@ API_SECRET = os.getenv("API_SECRET")
 PAPER = os.getenv("PAPER", "True").strip().lower() in ("1", "true", "yes")
 
 REPORT_PATH = "live_weekly_momentum.md"
-MIN_ORDER_NOTIONAL = 1.0     # Alpaca minimum
-MIN_TRADE_FRACTION = 0.005   # skip rebalance trades < 0.5% of equity (churn control)
 MAX_STALE_DAYS = 5           # max consecutive missing prints before a name is dropped
 MAX_DATA_AGE_DAYS = 4        # refuse to trade if the latest bar is older than this
-
-
-def build_orders(targets: dict, current: dict, equity: float) -> list:
-    """
-    Orders as (symbol, side, notional_or_None, close_all: bool), sells first,
-    largest deltas first. `targets` are weights (sum <= 1, remainder cash);
-    positions held but not in targets are liquidated.
-    """
-    symbols = set(targets) | set(current)
-    deltas = {}
-    for s in symbols:
-        target_notional = equity * targets.get(s, 0.0)
-        deltas[s] = (target_notional, target_notional - current.get(s, 0.0))
-
-    orders = []
-    ordered = sorted(symbols, key=lambda s: (deltas[s][1] > 0, -abs(deltas[s][1])))
-    for s in ordered:
-        target_notional, delta = deltas[s]
-        if abs(delta) < max(MIN_ORDER_NOTIONAL, MIN_TRADE_FRACTION * equity):
-            continue
-        if target_notional < MIN_ORDER_NOTIONAL and current.get(s, 0.0) > 0:
-            orders.append((s, "sell", None, True))          # close position entirely
-        elif delta < 0:
-            orders.append((s, "sell", round(-delta, 2), False))
-        else:
-            orders.append((s, "buy", round(delta, 2), False))
-    return orders
 
 
 def main():
@@ -89,6 +62,9 @@ def main():
                         "ranker + HMM gate). Needs xgboost/hmmlearn and ~3y more "
                         "history; only switch after it beats the default method "
                         "out-of-sample (main/backtest_weekly_holistic.py).")
+    p.add_argument("--force", action="store_true",
+                   help="Run even if the account holds another sleeve's positions "
+                        "(they WILL be liquidated). See main/deploy_sleeves.py.")
     args = p.parse_args()
 
     now = datetime.now(timezone.utc)
@@ -140,6 +116,21 @@ def main():
                  for pos in client.get_all_positions()}
     print(f"Account ({'PAPER' if PAPER else 'LIVE'}): equity ${equity:,.2f}, "
           f"{len(positions)} open positions")
+
+    # This deployer manages the WHOLE account: it liquidates every position not
+    # in its own target book. Once the two-sleeve deployer is live the account
+    # also holds the diversifier sleeve, which this script would happily sell.
+    # Refuse rather than silently flatten it.
+    from src.strategies.sleeves import SLEEVES
+    foreign = sorted({s for sl in SLEEVES if sl.universe and not sl.residual
+                      for s in sl.universe} & set(positions))
+    if foreign and not args.force:
+        print(f"\nABORT: the account holds {len(foreign)} position(s) belonging to "
+              f"another sleeve: {foreign}\n"
+              f"This single-sleeve deployer would liquidate them. Use\n"
+              f"    python main/deploy_sleeves.py\n"
+              f"which manages both sleeves, or pass --force to override.")
+        sys.exit(1)
 
     # 3) Target weights as of the latest close
     if args.holistic:
