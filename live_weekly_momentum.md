@@ -64,3 +64,25 @@ Signal date 2026-08-13, equity $102,619.29, gross exposure 0.23
 - SELL $541.8 SNDK  [submitted]
 - BUY  $2928.45 AMD  [submitted]
 
+2026-08-21 21:50:10.488618+00:00: weekly momentum rebalance (EXECUTED) - two-sleeve
+Equity $100,772.63, combined exposure 0.44
+
+- momentum: alloc 60%, signal 2026-08-20, sleeve gross 0.25, account contribution 0.148
+- diversifier: alloc 40%, signal 2026-08-20, sleeve gross 0.74, account contribution 0.295
+
+WARNINGS: none
+
+- SELL $996.0 MU  [submitted]
+- SELL $985.46 DELL  [submitted]
+- SELL $849.27 AMD  [submitted]
+- SELL $781.05 MRVL  [submitted]
+- SELL $744.9 STX  [submitted]
+- SELL $712.49 LITE  [submitted]
+- SELL $692.61 FLEX  [submitted]
+- SELL $578.33 SNDK  [submitted]
+- SELL $551.01 INTC  [submitted]
+- SELL $433.3 WDC  [submitted]
+- BUY  $11887.62 UUP  [submitted]
+- BUY  $11864.23 DBC  [submitted]
+- BUY  $5967.2 SLV  [submitted]
+
