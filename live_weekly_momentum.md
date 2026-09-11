@@ -99,3 +99,15 @@ WARNINGS: none
 - BUY  $328.19 MRVL  [submitted]
 - BUY  $272.95 DBC  [submitted]
 
+2026-09-11 23:29:22.752384+00:00: weekly momentum rebalance (EXECUTED) - two-sleeve
+Equity $101,843.98, combined exposure 0.49
+
+- momentum: alloc 60%, signal 2026-09-10, sleeve gross 0.26, account contribution 0.157
+- diversifier: alloc 40%, signal 2026-09-10, sleeve gross 0.83, account contribution 0.330
+
+WARNINGS: none
+
+- BUY  $1150.2 UUP  [submitted]
+- BUY  $869.32 SLV  [submitted]
+- BUY  $443.38 DBC  [submitted]
+
