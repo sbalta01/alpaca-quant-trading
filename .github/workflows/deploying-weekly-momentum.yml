@@ -24,6 +24,10 @@ jobs:
           persist-credentials: true
           fetch-depth: 1
 
+      - name: Initialize current report
+        run: |
+          printf 'FAILED: this rebalance did not complete. See workflow run %s for details.\n' "$GITHUB_RUN_ID" > latest_weekly_momentum.md
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -41,19 +45,6 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: python main/deploy_sleeves.py --execute
 
-      - name: Extract latest run summary
-        if: always()
-        run: |
-          # Grab everything from the most recent run header to end of file
-          # so the email reports only this run's balance and movements.
-          start=$(grep -n "weekly momentum rebalance" live_weekly_momentum.md | tail -1 | cut -d: -f1)
-          if [ -n "${start}" ]; then
-            tail -n +"${start}" live_weekly_momentum.md > latest_weekly_momentum.md
-          else
-            cp live_weekly_momentum.md latest_weekly_momentum.md
-          fi
-          cat latest_weekly_momentum.md
-
       - name: Send report as email body
         if: always()
         uses: dawidd6/action-send-mail@v6
@@ -69,6 +60,7 @@ jobs:
           body:           file://latest_weekly_momentum.md
 
       - name: Commit report
+        if: always()
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

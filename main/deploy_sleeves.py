@@ -34,6 +34,7 @@ import dataclasses
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import holidays
 import pandas as pd
@@ -55,9 +56,29 @@ API_SECRET = os.getenv("API_SECRET")
 PAPER = os.getenv("PAPER", "True").strip().lower() in ("1", "true", "yes")
 
 REPORT_PATH = "live_weekly_momentum.md"
+LATEST_REPORT_PATH = "latest_weekly_momentum.md"
+MARKET_TZ = ZoneInfo("America/New_York")
 MAX_STALE_DAYS = 5           # max consecutive missing prints before a name is dropped
 MAX_DATA_AGE_DAYS = 4        # refuse to trade if the latest bar is older than this
 HISTORY_DAYS = 600           # covers 252+21 momentum + the 200dma gate
+
+
+def latest_completed_session(now):
+    """Use completed daily bars; the Friday job runs after 16:00 New York."""
+    local = now.astimezone(MARKET_TZ)
+    day = local.date() - timedelta(days=int(local.hour < 16))
+    closed = holidays.financial_holidays("NYSE")
+    while day.weekday() >= 5 or day in closed:
+        day -= timedelta(days=1)
+    return day
+
+
+def write_report(lines):
+    text = "\n".join(lines) + "\n\n"
+    with open(LATEST_REPORT_PATH, "w", encoding="utf-8") as f:
+        f.write(text)
+    with open(REPORT_PATH, "a", encoding="utf-8") as f:
+        f.write(text)
 
 
 @dataclasses.dataclass
@@ -170,9 +191,14 @@ def main():
     args = p.parse_args()
 
     now = datetime.now(timezone.utc)
-    if now.date().weekday() >= 5 or now.date() in holidays.financial_holidays("NYSE"):
-        print("Weekend/holiday: orders would just queue; exiting.")
-        sys.exit(0)
+    # Clear the current report before any operation can fail.
+    with open(LATEST_REPORT_PATH, "w", encoding="utf-8") as f:
+        f.write(f"{now}: FAILED: rebalance did not complete. See this run's logs.\n")
+    market_date = now.astimezone(MARKET_TZ).date()
+    if market_date.weekday() >= 5 or market_date in holidays.financial_holidays("NYSE"):
+        write_report([f"{now}: weekly momentum rebalance (SKIPPED)",
+                      "Weekend/market holiday in New York; no orders submitted."])
+        sys.exit(1 if os.getenv("GITHUB_EVENT_NAME") == "schedule" else 0)
 
     sleeves, declared = resolve_sleeves(args.only, args.allocation_momentum)
     print("Running: " + ", ".join(f"{s.name} {s.allocation:.0%}" for s in sleeves))
@@ -194,7 +220,9 @@ def main():
 
     wanted = sorted(set().union(*universes.values()) | {"SPY"})
     start = now - timedelta(days=HISTORY_DAYS)
-    prices = fetch_close_matrix(wanted, start, now)
+    signal_date = latest_completed_session(now)
+    # yfinance's end date is exclusive, so include the completed Friday bar.
+    prices = fetch_close_matrix(wanted, start, signal_date + timedelta(days=1))
     if "SPY" not in prices.columns:
         print("ABORT: no SPY data; cannot evaluate the regime gate.")
         sys.exit(1)
@@ -203,6 +231,8 @@ def main():
     # carry a flat price forward indefinitely, which keeps it selectable - and
     # buyable. Past a week of no prints, drop the name entirely.
     prices = prices.reindex(prices["SPY"].dropna().index).ffill(limit=MAX_STALE_DAYS)
+    if prices.empty or prices.index[-1].date() != signal_date:
+        raise RuntimeError(f"Missing completed SPY bar for {signal_date}; refusing stale signals.")
     dead = prices.columns[prices.iloc[-1].isna()]
     if len(dead) > 0:
         print(f"Dropping {len(dead)} ticker(s) with no recent price: {list(dead)}")
@@ -279,10 +309,9 @@ def main():
     orphans = {sym: positions[sym] for sym, side, _, _ in orders
                if side == "sell" and sym in positions and sym not in claimed}
 
-    # 5) Report + submission. Keep the literal "weekly momentum rebalance" - the
-    # workflow greps for it to build the email body.
+    # 5) Report + submission. Each invocation writes its own email body.
     lines = [f"{now}: weekly momentum rebalance "
-             f"({'EXECUTED' if args.execute else 'DRY RUN'}) - two-sleeve",
+             f"({'ORDER SUBMISSION' if args.execute else 'DRY RUN'}) - two-sleeve",
              f"Equity ${equity:,.2f}, combined exposure {combined.sum():.2f}", ""]
     for r in results:
         if r.status == "ok":
@@ -306,6 +335,7 @@ def main():
     lines.append("")
 
     print()
+    submission_failed = False
     for symbol, side, notional, close_all in orders:
         desc = f"{side.upper():4s} {'ALL' if close_all else f'${notional}'} {symbol}"
         if args.execute:
@@ -318,12 +348,19 @@ def main():
                     side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
                     req = MarketOrderRequest(symbol=symbol, notional=notional, side=side_enum,
                                              time_in_force=TimeInForce.DAY)
-                client.submit_order(req)
-                desc += "  [submitted]"
+                order = client.submit_order(req)
+                status = order.status.value
+                desc += (f"  [id={order.id}; status={status}; "
+                         f"filled_qty={order.filled_qty}; avg_fill_price={order.filled_avg_price}]")
+                submission_failed = status in {"rejected", "canceled", "expired", "suspended"}
             except Exception as e:
                 desc += f"  [ERROR: {e}]"
+                submission_failed = True
         print(desc)
         lines.append(f"- {desc}")
+        if submission_failed:
+            lines.append("FAILED: remaining orders stopped. Check broker orders before retrying.")
+            break
 
     if not orders:
         print("(no orders - everything already within the no-trade band)")
@@ -331,8 +368,11 @@ def main():
 
     if not args.execute:
         print("\nDry run only. Re-run with --execute to submit these orders.")
-    with open(REPORT_PATH, "a", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n\n")
+    if args.execute:
+        lines.append("Statuses above are at submission time; queued orders are not confirmed fills.")
+    write_report(lines)
+    if args.execute and (submission_failed or len(ok) != len(results)):
+        sys.exit(1)
 
 
 if __name__ == "__main__":
