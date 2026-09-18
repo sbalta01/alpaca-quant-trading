@@ -1,0 +1,92 @@
+{
+  "records": [
+    {
+      "date": "2026-07-20",
+      "equity": 100000.0,
+      "target_exposure": 0.25,
+      "submitted": 10,
+      "two_sleeve": false
+    },
+    {
+      "date": "2026-07-24",
+      "equity": 100000.0,
+      "target_exposure": 0.24,
+      "submitted": 10,
+      "two_sleeve": false
+    },
+    {
+      "date": "2026-07-31",
+      "equity": 98654.74,
+      "target_exposure": 0.21,
+      "submitted": 1,
+      "two_sleeve": false
+    },
+    {
+      "date": "2026-08-07",
+      "equity": 100261.4,
+      "target_exposure": 0.22,
+      "submitted": 4,
+      "two_sleeve": false
+    },
+    {
+      "date": "2026-08-14",
+      "equity": 102619.29,
+      "target_exposure": 0.23,
+      "submitted": 4,
+      "two_sleeve": false
+    },
+    {
+      "date": "2026-08-21",
+      "equity": 100772.63,
+      "target_exposure": 0.44,
+      "submitted": 13,
+      "two_sleeve": true
+    },
+    {
+      "date": "2026-09-04",
+      "equity": 100948.06,
+      "target_exposure": 0.46,
+      "submitted": 4,
+      "two_sleeve": true
+    },
+    {
+      "date": "2026-09-11",
+      "equity": 101843.98,
+      "target_exposure": 0.49,
+      "submitted": 3,
+      "two_sleeve": true
+    }
+  ],
+  "comparisons": [
+    {
+      "start": "2026-07-20",
+      "end": "2026-09-11",
+      "strategy": 0.018439799999999895,
+      "SPY": 0.029922323539344875,
+      "BIL": 0.005384023733655541,
+      "QQQ": 0.027037899031692847
+    },
+    {
+      "start": "2026-07-24",
+      "end": "2026-09-11",
+      "strategy": 0.018439799999999895,
+      "SPY": 0.034323700990367634,
+      "BIL": 0.0048319789150010894,
+      "QQQ": 0.04479487891498479
+    },
+    {
+      "start": "2026-08-21",
+      "end": "2026-09-11",
+      "strategy": 0.010631358931487478,
+      "SPY": -0.0018590767458303015,
+      "BIL": 0.001971090670170872,
+      "QQQ": 0.00201838977349178
+    }
+  ],
+  "snapshot_max_drawdown": -0.017995252159705877,
+  "scheduled_runs": 8,
+  "scheduled_reports": 7,
+  "submitted_orders": 49,
+  "account_match": false,
+  "valuation_through": "2026-09-11"
+}
