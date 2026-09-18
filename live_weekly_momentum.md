@@ -111,3 +111,19 @@ WARNINGS: none
 - BUY  $869.32 SLV  [submitted]
 - BUY  $443.38 DBC  [submitted]
 
+2026-09-18 23:29:42.558010+00:00: weekly momentum rebalance (ORDER SUBMISSION) - two-sleeve
+Equity $102,493.56, combined exposure 0.49
+
+- momentum: alloc 60%, signal 2026-09-18, sleeve gross 0.27, account contribution 0.160
+- diversifier: alloc 40%, signal 2026-09-18, sleeve gross 0.83, account contribution 0.331
+
+WARNINGS: none
+
+- SELL ALL FLEX  [id=c2c29cab-4d54-4fa5-82f9-2f7286b1d3c5; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $459.13 WDC  [id=3c7ee2e3-c137-4dff-8e19-8b39bd1ee0a2; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $451.37 MU  [id=5acb8744-0ddf-4037-94d1-98ba2c79c793; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $442.34 MRNA  [id=47fadfff-e112-4f23-bfc1-a896f20c33de; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $338.92 MRVL  [id=cfa78caa-efc5-405c-a7eb-2994946c3018; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $308.24 STX  [id=a562c9d7-1ffc-4578-a8c9-f620944c2cdd; status=accepted; filled_qty=0; avg_fill_price=None]
+Statuses above are at submission time; queued orders are not confirmed fills.
+
