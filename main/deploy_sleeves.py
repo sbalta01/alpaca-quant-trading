@@ -33,6 +33,7 @@ import argparse
 import dataclasses
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -61,6 +62,8 @@ MARKET_TZ = ZoneInfo("America/New_York")
 MAX_STALE_DAYS = 5           # max consecutive missing prints before a name is dropped
 MAX_DATA_AGE_DAYS = 4        # refuse to trade if the latest bar is older than this
 HISTORY_DAYS = 600           # covers 252+21 momentum + the 200dma gate
+PRICE_DOWNLOAD_ATTEMPTS = 3
+PRICE_RETRY_SECONDS = 30
 
 
 def latest_completed_session(now):
@@ -79,6 +82,37 @@ def write_report(lines):
         f.write(text)
     with open(REPORT_PATH, "a", encoding="utf-8") as f:
         f.write(text)
+
+
+def fetch_completed_prices(wanted, start, signal_date):
+    """Retry incomplete downloads before touching the account; never use stale SPY."""
+    end = signal_date + timedelta(days=1)  # yfinance end is exclusive
+    problem = ""
+    for attempt in range(1, PRICE_DOWNLOAD_ATTEMPTS + 1):
+        try:
+            prices = fetch_close_matrix(wanted, start, end)
+            # Do not let an unexpected later row become the signal session.
+            if not prices.empty:
+                prices = prices.loc[prices.index < pd.Timestamp(end)]
+            spy = prices["SPY"].dropna() if "SPY" in prices else pd.Series(dtype=float)
+            latest = spy.index[-1].date() if not spy.empty else None
+            print(f"Price download {attempt}/{PRICE_DOWNLOAD_ATTEMPTS}: "
+                  f"expected SPY session {signal_date}, latest received {latest}, "
+                  f"{len(prices)} rows, {len(prices.columns)} symbols")
+            if latest == signal_date:
+                # Check the real SPY print BEFORE forward filling other symbols.
+                return prices.reindex(spy.index).ffill(limit=MAX_STALE_DAYS)
+            problem = (f"Missing completed SPY bar for {signal_date}; "
+                       f"latest received: {latest}")
+        except Exception as exc:
+            problem = f"Price download failed: {type(exc).__name__}: {exc}"
+            print(problem)
+        if attempt < PRICE_DOWNLOAD_ATTEMPTS:
+            delay = PRICE_RETRY_SECONDS * attempt
+            print(f"Retrying the price panel in {delay}s; no orders submitted.")
+            time.sleep(delay)
+    raise RuntimeError(f"{problem}; exhausted {PRICE_DOWNLOAD_ATTEMPTS} attempts. "
+                       "Refusing stale signals; no orders submitted.")
 
 
 @dataclasses.dataclass
@@ -221,18 +255,15 @@ def main():
     wanted = sorted(set().union(*universes.values()) | {"SPY"})
     start = now - timedelta(days=HISTORY_DAYS)
     signal_date = latest_completed_session(now)
-    # yfinance's end date is exclusive, so include the completed Friday bar.
-    prices = fetch_close_matrix(wanted, start, signal_date + timedelta(days=1))
-    if "SPY" not in prices.columns:
-        print("ABORT: no SPY data; cannot evaluate the regime gate.")
-        sys.exit(1)
+    try:
+        prices = fetch_completed_prices(wanted, start, signal_date)
+    except RuntimeError as exc:
+        write_report([f"{now}: weekly momentum rebalance (FAILED)", str(exc)])
+        raise
 
     # Bounded ffill only. An unbounded ffill lets a halted or delisted ticker
     # carry a flat price forward indefinitely, which keeps it selectable - and
     # buyable. Past a week of no prints, drop the name entirely.
-    prices = prices.reindex(prices["SPY"].dropna().index).ffill(limit=MAX_STALE_DAYS)
-    if prices.empty or prices.index[-1].date() != signal_date:
-        raise RuntimeError(f"Missing completed SPY bar for {signal_date}; refusing stale signals.")
     dead = prices.columns[prices.iloc[-1].isna()]
     if len(dead) > 0:
         print(f"Dropping {len(dead)} ticker(s) with no recent price: {list(dead)}")

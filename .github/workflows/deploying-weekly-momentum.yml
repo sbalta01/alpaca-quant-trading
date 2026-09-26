@@ -56,8 +56,11 @@ jobs:
           subject:        "Weekly Momentum Rebalance Report"
           from:           ${{ secrets.SMTP_USERNAME }}
           to:             ${{ secrets.SMTP_USERNAME }}
-          content_type:   text/plain
           body:           file://latest_weekly_momentum.md
+
+      - name: Publish current report in run summary
+        if: always()
+        run: cat latest_weekly_momentum.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit report
         if: always()
