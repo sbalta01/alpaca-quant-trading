@@ -127,3 +127,6 @@ WARNINGS: none
 - BUY  $308.24 STX  [id=a562c9d7-1ffc-4578-a8c9-f620944c2cdd; status=accepted; filled_qty=0; avg_fill_price=None]
 Statuses above are at submission time; queued orders are not confirmed fills.
 
+2026-09-26 22:51:20.916983+00:00: weekly momentum rebalance (SKIPPED)
+Weekend/market holiday in New York; no orders submitted.
+
