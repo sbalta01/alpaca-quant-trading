@@ -2,8 +2,8 @@ name: Weekly Momentum Deploy
 run-name: ${{ github.actor }} is running the weekly momentum rebalance.
 
 on:
-  schedule: ## Friday 21:30 UTC = after US close year-round; DAY orders queue for Monday open
-    - cron: '30 21 * * 5'
+  schedule: ## Saturday 14:30 UTC = 09:30 CDT / 08:30 CST; use completed Friday prices
+    - cron: '30 14 * * 6'
   workflow_dispatch:        # Allows manual trigger
 
 permissions:

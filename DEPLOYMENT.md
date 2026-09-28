@@ -1,8 +1,8 @@
 # Deployment Guide
 
-How to run this repo yourself, for backtesting and for live/paper trading. The recommended production path is the **weekly momentum portfolio** (`src/strategies/weekly_momentum.py`) deployed through **GitHub Actions on a Friday-evening schedule**, exactly like your existing monthly rebalance job. Reasons: it needs no GPU/torch/sklearn so CI runs are fast and cheap, it has no model files to version, every decision is reproducible from the day's closes, and it reuses the Alpaca execution pattern you already trust.
+How to run this repo yourself, for backtesting and for live/paper trading. The recommended production path is the **weekly momentum portfolio** (`src/strategies/weekly_momentum.py`) deployed through **GitHub Actions on a Saturday-morning schedule**, exactly like your existing monthly rebalance job. Reasons: it needs no GPU/torch/sklearn so CI runs are fast and cheap, it has no model files to version, every decision is reproducible from the day's closes, and it reuses the Alpaca execution pattern you already trust.
 
-**Live default config (2026-08-19): two sleeves.** The Friday job now runs `main/deploy_sleeves.py`, which splits the account **60% momentum / 40% diversifier** and submits one netted set of orders.
+**Live default config (2026-08-19): two sleeves.** The Saturday job runs `main/deploy_sleeves.py`, which splits the account **60% momentum / 40% diversifier** and submits one netted set of orders.
 
 * **Momentum sleeve (60%)** — unchanged strategy, now sized against 60% of equity.
 * **Diversifier sleeve (40%)** — `TLT, IEF, SHY, TIP, GLD, SLV, DBC, UUP`, top-3 by the same momentum machinery, inverse-vol capped at 40%, vol targeting at 0.10, **no 200dma gate** (when equities roll over the right response for this sleeve is rotating into bonds/gold, not going to cash on an equity signal).
@@ -103,11 +103,11 @@ python main/deploy_weekly_momentum.py --execute  # submits orders (paper while P
 
 Orders are market DAY orders: run after the close and they queue for the next open. Sells are submitted before buys; dropped names are liquidated by share quantity; trades under 0.5% of equity are skipped to control churn. Each run appends to `live_weekly_momentum.md`.
 
-Hardening (2026-07): the universe scrape now retries with backoff, validates the parse (count, ticker syntax, overlap with the last known-good list), and falls back to the committed `src/data/nasdaq100_snapshot.csv` on failure - a Wikipedia outage can no longer fail (or worse, mis-trade) the Friday run. Prices use a bounded `ffill(limit=5)` so a halted/delisted name drops out instead of being carried at a flat price, and the run aborts if the latest bar is more than 4 days old. Rank buffering (`--buffer-mult`, default 1.5) treats your actual account positions as incumbents.
+Hardening (2026-07): the universe scrape now retries with backoff, validates the parse (count, ticker syntax, overlap with the last known-good list), and falls back to the committed `src/data/nasdaq100_snapshot.csv` on failure - a Wikipedia outage can no longer fail (or worse, mis-trade) the weekly run. Prices use a bounded `ffill(limit=5)` so a halted/delisted name drops out instead of being carried at a flat price, and the run aborts if the latest bar is more than 4 days old. Rank buffering (`--buffer-mult`, default 1.5) treats your actual account positions as incumbents.
 
 ## 3. Live / paper trading — scheduled (recommended)
 
-The workflow `.github/workflows/deploying-weekly-momentum.yml` runs every Friday 21:30 UTC (after US close; fills happen at Monday's open).
+The workflow `.github/workflows/deploying-weekly-momentum.yml` runs every Saturday at 14:30 UTC (9:30 a.m. Chicago daylight time / 8:30 a.m. standard time). It uses Friday's completed prices, or the preceding trading session when Friday is a market holiday. Orders are submitted for the next market open, normally Monday; submission is not confirmation of a fill. Saturday gives the data provider overnight time to publish Friday's daily bars. The download still retries and refuses stale signals if the required session is unavailable. Sunday and weekday market-holiday invocations are skipped.
 
 One-time GitHub setup:
 1. Push the repo to GitHub (private recommended).

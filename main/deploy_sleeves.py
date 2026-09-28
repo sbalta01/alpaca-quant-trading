@@ -26,8 +26,9 @@ symbols removed from the managed set for that run. It is never represented as
 "target 0", because that would read as "liquidate everything I hold" - one
 yfinance hiccup would flatten the ETF book. See --only and the SKIPPED path.
 
-Intended schedule: once a week after Friday's close (orders queue for Monday's
-open) - see .github/workflows/deploying-weekly-momentum.yml.
+Intended schedule: Saturday morning using the latest completed trading session
+(normally Friday). Orders queue for the next market open - see
+.github/workflows/deploying-weekly-momentum.yml.
 """
 import argparse
 import dataclasses
@@ -67,7 +68,7 @@ PRICE_RETRY_SECONDS = 30
 
 
 def latest_completed_session(now):
-    """Use completed daily bars; the Friday job runs after 16:00 New York."""
+    """Use completed daily bars, including Friday for the Saturday job."""
     local = now.astimezone(MARKET_TZ)
     day = local.date() - timedelta(days=int(local.hour < 16))
     closed = holidays.financial_holidays("NYSE")
@@ -229,9 +230,12 @@ def main():
     with open(LATEST_REPORT_PATH, "w", encoding="utf-8") as f:
         f.write(f"{now}: FAILED: rebalance did not complete. See this run's logs.\n")
     market_date = now.astimezone(MARKET_TZ).date()
-    if market_date.weekday() >= 5 or market_date in holidays.financial_holidays("NYSE"):
+    # Saturday is the weekly deployment day. Friday holidays roll the signal
+    # back to the previous session via latest_completed_session below.
+    if market_date.weekday() == 6 or (
+            market_date.weekday() < 5 and market_date in holidays.financial_holidays("NYSE")):
         write_report([f"{now}: weekly momentum rebalance (SKIPPED)",
-                      "Weekend/market holiday in New York; no orders submitted."])
+                      "Sunday/weekday market holiday in New York; no orders submitted."])
         sys.exit(1 if os.getenv("GITHUB_EVENT_NAME") == "schedule" else 0)
 
     sleeves, declared = resolve_sleeves(args.only, args.allocation_momentum)

@@ -1,4 +1,4 @@
-"""Small offline regressions for the Friday date and report bugs."""
+"""Offline regressions for weekly deployment dates, downloads and reports."""
 import tempfile
 import unittest
 from datetime import date, datetime
@@ -87,6 +87,45 @@ class FridayDeployTests(unittest.TestCase):
         now = datetime.fromisoformat('2026-08-29T03:15:00+00:00')
         self.assertEqual(now.astimezone(deploy.MARKET_TZ).date(), date(2026, 8, 28))
         self.assertEqual(deploy.latest_completed_session(now), date(2026, 8, 28))
+
+    def test_saturday_run_reaches_download_with_last_completed_session(self):
+        for stamp, expected in [
+                ('2026-09-26T14:30:00+00:00', date(2026, 9, 25)),
+                ('2026-01-10T14:30:00+00:00', date(2026, 1, 9)),
+                ('2026-04-04T14:30:00+00:00', date(2026, 4, 2)),  # Good Friday
+                ('2026-09-27T03:15:00+00:00', date(2026, 9, 25))]:  # delayed Saturday NY
+            with self.subTest(stamp=stamp), tempfile.TemporaryDirectory() as folder, \
+                    patch.object(deploy, 'LATEST_REPORT_PATH', Path(folder) / 'latest.md'), \
+                    patch.object(deploy, 'REPORT_PATH', Path(folder) / 'history.md'), \
+                    patch.object(deploy.sys, 'argv', ['deploy_sleeves.py', '--execute']), \
+                    patch.dict(deploy.os.environ, {'GITHUB_EVENT_NAME': 'schedule'}), \
+                    patch.object(deploy, 'datetime') as clock, \
+                    patch('src.data.universe.fetch_sp500_symbols', return_value=['AAPL']), \
+                    patch.object(deploy, 'fetch_completed_prices', side_effect=RuntimeError('test stop')) as fetch, \
+                    patch('alpaca.trading.client.TradingClient') as broker:
+                clock.now.return_value = datetime.fromisoformat(stamp)
+                with self.assertRaisesRegex(RuntimeError, 'test stop'):
+                    deploy.main()
+                self.assertEqual(fetch.call_args.args[2], expected)
+                broker.assert_not_called()
+
+    def test_sunday_and_weekday_holidays_still_skip(self):
+        for stamp in ['2026-09-27T14:30:00+00:00', '2026-04-03T14:30:00+00:00']:
+            with self.subTest(stamp=stamp), tempfile.TemporaryDirectory() as folder, \
+                    patch.object(deploy, 'LATEST_REPORT_PATH', Path(folder) / 'latest.md'), \
+                    patch.object(deploy, 'REPORT_PATH', Path(folder) / 'history.md'), \
+                    patch.object(deploy.sys, 'argv', ['deploy_sleeves.py', '--execute']), \
+                    patch.dict(deploy.os.environ, {'GITHUB_EVENT_NAME': 'schedule'}), \
+                    patch.object(deploy, 'datetime') as clock, \
+                    patch('src.data.universe.fetch_sp500_symbols') as universe, \
+                    patch('alpaca.trading.client.TradingClient') as broker:
+                clock.now.return_value = datetime.fromisoformat(stamp)
+                with self.assertRaises(SystemExit) as stopped:
+                    deploy.main()
+                self.assertEqual(stopped.exception.code, 1)
+                universe.assert_not_called()
+                broker.assert_not_called()
+                self.assertIn('SKIPPED', Path(deploy.LATEST_REPORT_PATH).read_text())
 
     def test_includes_friday_only_after_close(self):
         for stamp, expected in [('2026-09-18T21:30:00+00:00', date(2026, 9, 18)),
