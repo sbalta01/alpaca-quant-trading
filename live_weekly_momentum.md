@@ -130,3 +130,31 @@ Statuses above are at submission time; queued orders are not confirmed fills.
 2026-09-26 22:51:20.916983+00:00: weekly momentum rebalance (SKIPPED)
 Weekend/market holiday in New York; no orders submitted.
 
+2026-09-28 16:56:59.100357+00:00: weekly momentum rebalance (ORDER SUBMISSION) - two-sleeve
+Equity $102,335.38, combined exposure 0.56
+
+- momentum: alloc 60%, signal 2026-09-25, sleeve gross 0.30, account contribution 0.182
+- diversifier: alloc 40%, signal 2026-09-25, sleeve gross 0.94, account contribution 0.376
+
+WARNINGS: none
+
+- SELL ALL REGN  [id=7eb67f98-14ed-475b-9a5f-f91d0a327e93; status=pending_new; filled_qty=0; avg_fill_price=None]
+- SELL ALL WDAY  [id=95cd2628-f325-41c4-81f1-e89bc2583215; status=pending_new; filled_qty=0; avg_fill_price=None]
+- SELL ALL CRWD  [id=add93858-61e5-407d-8ace-c6a0df3f9cf8; status=pending_new; filled_qty=0; avg_fill_price=None]
+- SELL ALL CTAS  [id=ca9defb6-d022-438e-861e-e74a393419ed; status=pending_new; filled_qty=0; avg_fill_price=None]
+- SELL ALL PYPL  [id=9157b4ec-23db-4961-81c6-804373c04b7c; status=pending_new; filled_qty=0; avg_fill_price=None]
+- SELL ALL META  [id=c088fd8e-0798-4abe-a6ad-96aeb508f6b0; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $2495.03 HPE  [id=7c92eab7-a6b0-4c89-b5f7-1e3ec0588821; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $2127.14 STX  [id=d86bacef-8832-4e97-b50b-7b9d706ccebb; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $2090.67 MU  [id=628fb574-35d0-4978-9c5c-285465b25773; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $1946.61 MRVL  [id=e2e8e65b-def3-422a-a543-9a8d0b76f62a; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $1920.7 WDC  [id=fa78df0b-afd6-4987-a4e4-b7d732734c5d; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $1835.47 SLV  [id=a3ed0f27-53b5-4747-a9ab-f57a4358405f; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $1681.07 DBC  [id=d8ef9f04-b55f-4e39-92e5-68e8d7533d88; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $1646.09 UUP  [id=a8ae36ca-e57c-4d1e-b0d2-adf17d7f9d20; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $1472.6 LITE  [id=f01c0602-1dbb-46e8-9049-8e58354acc84; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $1354.82 SNDK  [id=9235cb83-8dc0-4772-be1b-5507acb5f951; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $544.3 AMD  [id=4b952a95-d788-4c54-bd78-faed5b8f9fb4; status=pending_new; filled_qty=0; avg_fill_price=None]
+- BUY  $313.41 DELL  [id=390dba2a-354b-4de0-8872-941ec2e7dcb6; status=pending_new; filled_qty=0; avg_fill_price=None]
+Statuses above are at submission time; queued orders are not confirmed fills.
+
