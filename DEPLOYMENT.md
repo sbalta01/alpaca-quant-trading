@@ -116,6 +116,8 @@ One-time GitHub setup:
 4. Actions tab → enable workflows → you can trigger a first run manually via "Run workflow" (workflow_dispatch) to check the logs.
 5. Each run commits its report (`live_weekly_momentum.md`) back to the repo, so your trade history is versioned.
 
+The email shows current versus target account and sleeve exposures, implied target cash, SPY's distance from its 200-day average, and the fully invested basket's annualized 21-day/63-day volatility estimates used for sizing. It identifies the controlling volatility window and any trend-based exposure reduction before the trade band. Trade lines show side, amount, and symbol; failures remain explicit. Routine broker IDs and submission statuses are retained in the workflow logs and committed history, but omitted from the email. Targets are intended allocations, not confirmed fills; holdings belonging to skipped or inactive sleeves remain included in the account exposure estimate.
+
 The momentum and diversifier sleeves are now implemented as one job (`main/deploy_sleeves.py`), not as an aspiration — see the two-sleeve section at the top.
 
 Your existing monthly Monte-Carlo rebalance (`deploying-rebalance-portfolio.yml`) is `workflow_dispatch`-only (its cron is commented out), so there is no live conflict today. If you ever re-enable it, note that the residual momentum sleeve treats any position no sleeve's universe claims as an orphan and liquidates it — the run prints a loud `WARNING` and records it in the emailed report's `WARNINGS:` line whenever that happens. To coexist, add those symbols to a sleeve universe or run with `--no-liquidate-orphans`.
