@@ -158,3 +158,22 @@ WARNINGS: none
 - BUY  $313.41 DELL  [id=390dba2a-354b-4de0-8872-941ec2e7dcb6; status=pending_new; filled_qty=0; avg_fill_price=None]
 Statuses above are at submission time; queued orders are not confirmed fills.
 
+Weekly rebalance | 2026-09-28 | prices 2026-09-25
+Equity: $102,362.44
+Invested exposure: 55.9% -> 55.9% target (-0.0 percentage points)
+Implied cash at target: 44.1%
+
+Market trend: SPY $771.35, +7.9% vs 200-day average ($714.84); above/at trend threshold.
+
+Sleeve exposures (% of account equity):
+- momentum: 18.3% -> 18.3% target (+0.0 percentage points)
+  Basket volatility at full investment (annualized): 21d 44.6%, 63d 66.5% vs 20.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not reducing exposure (x1.00); model sleeve exposure 30.1%, after trade band 30.5%.
+- diversifier: 37.6% -> 37.6% target (+0.0 percentage points)
+  Basket volatility at full investment (annualized): 21d 8.1%, 63d 10.6% vs 10.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not applied; model sleeve exposure 94.0%, after trade band 93.9%.
+
+Order submissions (fills not yet confirmed):
+- No orders needed after trade-band and minimum-size filters.
+Statuses above are at submission time; queued orders are not confirmed fills.
+
