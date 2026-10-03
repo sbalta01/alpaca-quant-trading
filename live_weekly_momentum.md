@@ -177,3 +177,24 @@ Order submissions (fills not yet confirmed):
 - No orders needed after trade-band and minimum-size filters.
 Statuses above are at submission time; queued orders are not confirmed fills.
 
+Weekly rebalance | 2026-10-03 | prices 2026-10-02
+Equity: $103,171.03
+Invested exposure: 56.2% -> 55.9% target (-0.3 percentage points)
+Implied cash at target: 44.1%
+
+Market trend: SPY $769.64, +7.3% vs 200-day average ($717.04); above/at trend threshold.
+
+Sleeve exposures (% of account equity):
+- momentum: 18.8% -> 19.1% target (+0.3 percentage points)
+  Basket volatility at full investment (annualized): 21d 42.2%, 63d 62.6% vs 20.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not reducing exposure (x1.00); model sleeve exposure 31.9%, after trade band 31.9%.
+- diversifier: 37.4% -> 36.7% target (-0.7 percentage points)
+  Basket volatility at full investment (annualized): 21d 8.9%, 63d 10.9% vs 10.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not applied; model sleeve exposure 91.4%, after trade band 91.8%.
+
+Order submissions (fills not yet confirmed):
+- SELL $424.09 UUP  [id=752cd66f-199b-4fc9-85c0-1083a039be8d; status=accepted; filled_qty=0; avg_fill_price=None]
+- SELL $249.58 DBC  [id=b0406da6-3b28-4d67-bb6f-b31b49310be3; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $312.92 WDC  [id=45c9cade-cbc9-4091-bc2f-77e460d27cbb; status=accepted; filled_qty=0; avg_fill_price=None]
+Statuses above are at submission time; queued orders are not confirmed fills.
+
