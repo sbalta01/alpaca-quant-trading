@@ -198,3 +198,26 @@ Order submissions (fills not yet confirmed):
 - BUY  $312.92 WDC  [id=45c9cade-cbc9-4091-bc2f-77e460d27cbb; status=accepted; filled_qty=0; avg_fill_price=None]
 Statuses above are at submission time; queued orders are not confirmed fills.
 
+Weekly rebalance | 2026-10-10 | prices 2026-10-09
+Equity: $103,269.74
+Invested exposure: 55.9% -> 56.5% target (+0.6 percentage points)
+Implied cash at target: 43.5%
+
+Market trend: SPY $778.57, +8.2% vs 200-day average ($719.66); above/at trend threshold.
+
+Sleeve exposures (% of account equity):
+- momentum: 19.0% -> 20.1% target (+1.1 percentage points)
+  Basket volatility at full investment (annualized): 21d 37.5%, 63d 60.3% vs 20.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not reducing exposure (x1.00); model sleeve exposure 33.2%, after trade band 33.4%.
+- diversifier: 36.9% -> 36.4% target (-0.5 percentage points)
+  Basket volatility at full investment (annualized): 21d 8.7%, 63d 11.0% vs 10.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not applied; model sleeve exposure 90.6%, after trade band 91.0%.
+
+Order submissions (fills not yet confirmed):
+- SELL $313.7 SLV  [id=ecd19605-5011-4e37-8c5d-3808c9cc60ad; status=accepted; filled_qty=0; avg_fill_price=None]
+- SELL $233.51 DBC  [id=2ec9d58c-2159-4f93-b360-ed1a57a7a089; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $451.69 STX  [id=3875bf64-44c7-4a8a-af1a-49e7ae690262; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $368.9 AMD  [id=2d0e1a48-c4d3-45e2-bf15-3fad18c85108; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $322.6 SNDK  [id=3e82bb9d-4d11-4af0-9cb8-6a22ef397fce; status=accepted; filled_qty=0; avg_fill_price=None]
+Statuses above are at submission time; queued orders are not confirmed fills.
+
