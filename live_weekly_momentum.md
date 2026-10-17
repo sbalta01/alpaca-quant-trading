@@ -221,3 +221,35 @@ Order submissions (fills not yet confirmed):
 - BUY  $322.6 SNDK  [id=3e82bb9d-4d11-4af0-9cb8-6a22ef397fce; status=accepted; filled_qty=0; avg_fill_price=None]
 Statuses above are at submission time; queued orders are not confirmed fills.
 
+Weekly rebalance | 2026-10-17 | prices 2026-10-16
+Equity: $99,237.36
+Invested exposure: 54.7% -> 62.1% target (+7.4 percentage points)
+Implied cash at target: 37.9%
+
+Market trend: SPY $763.25, +5.7% vs 200-day average ($721.88); above/at trend threshold.
+
+Sleeve exposures (% of account equity):
+- momentum: 17.0% -> 22.1% target (+5.1 percentage points)
+  Basket volatility at full investment (annualized): 21d 42.4%, 63d 54.7% vs 20.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not reducing exposure (x1.00); model sleeve exposure 36.5%, after trade band 36.9%.
+- diversifier: 37.7% -> 40.0% target (+2.3 percentage points)
+  Basket volatility at full investment (annualized): 21d 3.7%, 63d 4.3% vs 10.0% target; using 63-day estimate, within target; no volatility reduction.
+  trend gate not applied; model sleeve exposure 100.0%, after trade band 100.0%.
+
+Order submissions (fills not yet confirmed):
+- SELL ALL SLV  [id=2822f570-9143-43b6-8ccc-72dcd15864c9; status=accepted; filled_qty=0; avg_fill_price=None]
+- SELL $6877.57 DBC  [id=2571ea2f-4d03-4ee5-9477-647795df400b; status=accepted; filled_qty=0; avg_fill_price=None]
+- SELL ALL WDC  [id=fbfc064b-4f65-460e-8f83-67880c005568; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $15880.19 SHY  [id=749c63c2-e9fa-4357-85bf-74b346a16b90; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $2553.64 CRWD  [id=11e89605-70f7-44e4-8fda-0b16dec4f4e6; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $776.34 UUP  [id=8d78a2ec-2e87-43cc-9811-87d982d786d0; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $714.27 MU  [id=5729934f-a7bf-4a13-8e14-dbf2bdcf3541; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $629.85 MRVL  [id=5721a14e-4262-4dad-93f1-a00236d2d394; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $603.41 DELL  [id=f7f0f410-f187-4bbe-800e-aa449dbd17c2; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $595.64 STX  [id=d0712e93-192c-4ea6-8e7d-b81ad460a938; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $490.93 HPE  [id=36bd7b8b-e62c-4c7f-86f1-ee4f13b78b9c; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $443.39 AMD  [id=f9a49d30-c052-425d-b9d9-40f2efe2af33; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $399.63 SNDK  [id=9754cceb-9a0d-443c-9d77-4bee85638bd5; status=accepted; filled_qty=0; avg_fill_price=None]
+- BUY  $318.41 LITE  [id=89e4d2ca-4ead-4721-b2ff-3e25e4e4297f; status=accepted; filled_qty=0; avg_fill_price=None]
+Statuses above are at submission time; queued orders are not confirmed fills.
+
