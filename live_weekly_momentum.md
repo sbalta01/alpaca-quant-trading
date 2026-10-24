@@ -253,3 +253,22 @@ Order submissions (fills not yet confirmed):
 - BUY  $318.41 LITE  [id=89e4d2ca-4ead-4721-b2ff-3e25e4e4297f; status=accepted; filled_qty=0; avg_fill_price=None]
 Statuses above are at submission time; queued orders are not confirmed fills.
 
+Weekly rebalance | 2026-10-24 | prices 2026-10-23
+Equity: $99,267.54
+Invested exposure: 62.0% -> 61.6% target (-0.4 percentage points)
+Implied cash at target: 38.4%
+
+Market trend: SPY $759.97, +5.0% vs 200-day average ($724.00); above/at trend threshold.
+
+Sleeve exposures (% of account equity):
+- momentum: 21.9% -> 21.6% target (-0.4 percentage points)
+  Basket volatility at full investment (annualized): 21d 47.9%, 63d 54.3% vs 20.0% target; using 63-day estimate, above target; reduced exposure.
+  trend gate not reducing exposure (x1.00); model sleeve exposure 36.8%, after trade band 36.0%.
+- diversifier: 40.1% -> 40.1% target (-0.0 percentage points)
+  Basket volatility at full investment (annualized): 21d 3.6%, 63d 4.0% vs 10.0% target; using 63-day estimate, within target; no volatility reduction.
+  trend gate not applied; model sleeve exposure 100.0%, after trade band 100.2%.
+
+Order submissions (fills not yet confirmed):
+- SELL $351.64 CRWD  [id=892ff12d-b4e2-4551-beb0-29b93ad61bdd; status=accepted; filled_qty=0; avg_fill_price=None]
+Statuses above are at submission time; queued orders are not confirmed fills.
+
